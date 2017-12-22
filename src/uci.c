@@ -1,22 +1,28 @@
 /*
-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
-  Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
-  Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
-
-  Stockfish is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
-
-  Stockfish is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ McBrain, a UCI chess playing engine derived from Stockfish and Glaurung 2.1
+ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
+ Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish Authors)
+ Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish Authors)
+ Copyright (C) 2017 Michael Byrne, Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (McBrain Authors)
+ 
+ Other significant contributors through their Stockfish forks:
+ Ronald De Man - SF/Cfish and Syzygy tablebase author
+ Ivan Ivec - SF/Corchess author
+ Thomas Zipproth - SF/Brainfish author (Book author)
+ 
+ McBrain is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ 
+ McBrain is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -54,10 +60,17 @@ void position(Pos *pos, char *str)
     moves += 5;
   }
 
-  if (strncmp(str, "fen", 3) == 0) {
+  if (strncmp(str, "fen", 3) == 0)
+	{
     strncpy(fen, str + 4, 127);
     fen[127] = 0;
-  } else if (strncmp(str, "startpos", 8) == 0)
+	}
+  else if (strncmp(str, "f", 1) == 0)
+  {
+	  strncpy(fen, str + 2, 127);
+	  fen[127] = 0;
+  }
+  else if (strncmp(str, "startpos", 8) == 0)
     strcpy(fen, StartFEN);
   else
     return;
@@ -80,6 +93,11 @@ void position(Pos *pos, char *str)
         pos->st -= 100;
         pos_set_check_info(pos);
         ply -= 100;
+        // Make sure rule50 and pliesFromNull do not overflow.
+        if (pos->st->rule50 > 100)
+          pos->st->rule50 = 100;
+        if (pos->st->pliesFromNull > 100)
+          pos->st->pliesFromNull = 100;
       }
     }
 
@@ -152,6 +170,48 @@ error:
   fprintf(stderr, "No such option: %s\n", name);
 }
 
+// set() is called by typing "s" from the terminal when the user wants to use abbreviated
+// non-UCI comamnds and avoid the uci option protocol "setoption name (option name) value (xxx) ",
+// e.g., instead of typing "setoption name threads value 8" to set cores to 8 at the terminal,
+// the user simply types "s threads 8" - restricted to option names that do not contain
+// any white spaces - see ucioption.cpp.  The argument can take white spaces e.g.,
+// "s syzygypath /endgame tablebases/syzygy" will work
+
+
+
+void set(char *str)
+{
+	char *name, *value;
+	
+	name = strstr(str, "n");
+	if (!name) {
+		name = "";
+		goto error;
+	}
+	
+	name += 1;
+	while (isblank(*name))
+	name++;
+	
+	value = strstr(name, "v");
+	if (value) {
+		char *p = value - 1;
+		while (isblank(*p))
+		p--;
+		p[1] = 0;
+		value += 1;
+		while (isblank(*value))
+		value++;
+	}
+	if (!value || strlen(value) == 0)
+	value = "<empty>";
+	
+	if (option_set_by_name(name, value))
+	return;
+	
+error:
+	fprintf(stderr, "No such option: %s\n", name);
+}
 
 // go() is called when engine receives the "go" UCI command. The function sets
 // the thinking time and other parameters from the input string, then starts
@@ -171,7 +231,8 @@ void go(Pos *pos, char *str)
   Limits.nodes = 0;
 
   for (token = strtok(str, " \t"); token; token = strtok(NULL, " \t")) {
-    if (strcmp(token, "searchmoves") == 0)
+    if (strcmp(token, "searchmoves") == 0
+		|| strcmp(token, "sm") == 0)
       while ((token = strtok(NULL, " \t")))
         Limits.searchmoves[Limits.num_searchmoves++] = uci_to_move(pos, token);
     else if (strcmp(token, "wtime") == 0)
@@ -184,15 +245,18 @@ void go(Pos *pos, char *str)
       Limits.inc[BLACK] = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "movestogo") == 0)
       Limits.movestogo = atoi(strtok(NULL, " \t"));
-    else if (strcmp(token, "depth") == 0)
+    else if (strcmp(token, "depth") == 0
+			 || strcmp(token, "d") == 0)
       Limits.depth = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "nodes") == 0)
       Limits.nodes = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "movetime") == 0)
       Limits.movetime = atoi(strtok(NULL, " \t"));
-    else if (strcmp(token, "mate") == 0)
+    else if (strcmp(token, "mate") == 0
+			 || strcmp(token, "m") == 0)
       Limits.mate = atoi(strtok(NULL, " \t"));
-    else if (strcmp(token, "infinite") == 0)
+    else if (strcmp(token, "infinite") == 0
+			 || strcmp(token, "i") == 0)
       Limits.infinite = 1;
     else if (strcmp(token, "ponder") == 0)
       Limits.ponder = 1;
@@ -292,7 +356,10 @@ void uci_loop(int argc, char **argv)
     // already ran out of time), otherwise we should continue searching but
     // switching from pondering to normal search.
     if (   strcmp(token, "quit") == 0
-        || strcmp(token, "stop") == 0) {
+        || strcmp(token, "stop") == 0
+		|| strcmp(token, "q") == 0
+		|| strcmp(token, "?") == 0
+		) {
       if (Signals.searching) {
         Signals.stop = 1;
         LOCK(Signals.lock);
@@ -329,12 +396,17 @@ void uci_loop(int argc, char **argv)
       printf("readyok\n");
       fflush(stdout);
     }
-    else if (strcmp(token, "go") == 0)        go(&pos, str);
-    else if (strcmp(token, "position") == 0)  position(&pos, str);
-    else if (strcmp(token, "setoption") == 0) setoption(str);
+    else if (strcmp(token, "go") == 0
+			 || strcmp(token, "g") == 0)      go(&pos, str);
+    else if (strcmp(token, "position") == 0
+			 || strcmp(token, "p") == 0)  position(&pos, str);
+    else if (strcmp(token, "setoption") == 0
+			 || strcmp(token, "so") == 0) setoption(str);
+	else if (strcmp(token, "set") == 0) set(str);
 
     // Additional custom non-UCI commands, useful for debugging
-    else if (strcmp(token, "bench") == 0)     benchmark(&pos, str);
+    else if (strcmp(token, "bench") == 0
+			 || strcmp(token, "b") == 0)     benchmark(&pos, str);
     else if (strcmp(token, "d") == 0)         print_pos(&pos);
     else if (strcmp(token, "perft") == 0) {
       sprintf(str_buf, "%d %d %d current perft", option_value(OPT_HASH),

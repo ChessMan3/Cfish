@@ -1,22 +1,28 @@
 /*
-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
-  Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
-  Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
-
-  Stockfish is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
-
-  Stockfish is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ McBrain, a UCI chess playing engine derived from Stockfish and Glaurung 2.1
+ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
+ Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish Authors)
+ Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish Authors)
+ Copyright (C) 2017 Michael Byrne, Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (McBrain Authors)
+ 
+ Other significant contributors through their Stockfish forks:
+ Ronald De Man - SF/Cfish and Syzygy tablebase author
+ Ivan Ivec - SF/Corchess author
+ Thomas Zipproth - SF/Brainfish author (Book author)
+ 
+ McBrain is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ 
+ McBrain is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include <assert.h>
 #include <string.h>   // For std::memset
@@ -34,7 +40,7 @@ static const int QuadraticOurs[][8] = {
   {  32,  255,  -3                    }, // Knight      OUR PIECES
   {   0,  104,   4,    0              }, // Bishop
   { -26,   -2,  47,   105,  -149      }, // Rook
-  {-189,   24, 117,   133,  -134, -10 }  // Queen
+  {-185,   24, 122,   137,  -134,   0 }  // Queen
 };
 
 static const int QuadraticTheirs[][8] = {
@@ -45,7 +51,13 @@ static const int QuadraticTheirs[][8] = {
   {   9,   63,   0                    }, // Knight      OUR PIECES
   {  59,   65,  42,     0             }, // Bishop
   {  46,   39,  24,   -24,    0       }, // Rook
-  {  97,  100, -42,   137,  268,    0 }  // Queen
+  { 101,  100, -37,   141,  268,    0 }  // Queen
+};
+
+// QueenMinorsImbalance[opp_minor_count] is applied when only one side has
+// a queen. It contains a bonus/malus for the side with the queen.
+static const int QueenMinorsImbalance[13] = {
+  31, -8, -15, -25, -5
 };
 
 // Helper used to detect a given material distribution.
@@ -91,6 +103,10 @@ int imbalance(int us, int pieceCount[][8])
 
     bonus += pc_us[pt1] * v;
   }
+
+  // Special handling of queen vs minors
+  if (pc_us[QUEEN] == 1 && pc_them[QUEEN] == 0)
+    bonus += QueenMinorsImbalance[pc_them[KNIGHT] + pc_them[BISHOP]];
 
   return bonus;
 }

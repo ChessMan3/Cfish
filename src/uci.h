@@ -37,26 +37,36 @@ typedef void (*OnChange)(Option *);
 #define OPT_TYPE_STRING   3
 #define OPT_TYPE_DISABLED 4
 
-#define OPT_CONTEMPT        0
-#define OPT_THREADS         1
-#define OPT_HASH            2
-#define OPT_CLEAR_HASH      3
-#define OPT_PONDER          4
-#define OPT_MULTI_PV        5
-#define OPT_SKILL_LEVEL     6
-#define OPT_MOVE_OVERHEAD   7
-#define OPT_NODES_TIME      8
-#define OPT_CHESS960        9
-#define OPT_SYZ_PATH        10
-#define OPT_SYZ_PROBE_DEPTH 11
-#define OPT_SYZ_50_MOVE     12
-#define OPT_SYZ_PROBE_LIMIT 13
-#define OPT_SYZ_USE_DTM     14
-#define OPT_BOOK_FILE       15
-#define OPT_BOOK_BEST_MOVE  16
-#define OPT_BOOK_DEPTH      17
-#define OPT_LARGE_PAGES     18
-#define OPT_NUMA            19
+#define OPT_CHESS960        	0
+
+#define OPT_SYZ_PATH        	1
+#define OPT_SYZ_PROBE_DEPTH 	2
+#define OPT_SYZ_50_MOVE     	3
+#define OPT_SYZ_PROBE_LIMIT 	4
+#define OPT_SYZ_USE_DTM     	5
+#define OPT_BOOK_FILE       	6
+#define OPT_BOOK_BEST_MOVE  	7
+#define OPT_BOOK_DEPTH      	8
+
+#define OPT_HASH            	9
+#define OPT_CLEAR_HASH      	10
+#define OPT_PONDER          	11
+#define OPT_THREADS         	12
+#define OPT_CONTEMPT        	13
+#define OPT_MULTI_PV        	14
+#define OPT_TACTICAL        	15
+
+#define OPT_MOVE_OVERHEAD   	16
+#define OPT_NODES_TIME      	17
+//#define OPT_SKILL_LEVEL
+#define OPT_NUMA            	18
+
+#define OPT_BRUTEFORCE          19
+#define OPT_NONULLMOVE          20
+#define OPT_FAST_PLAY       	21
+#define OPT_UCI_LIMIT_STRENGTH  22
+#define OPT_UCI_ELO             23
+#define OPT_LARGE_PAGES     	24
 
 struct Option {
   char *name;
@@ -77,6 +87,7 @@ void option_set_value(int opt, int value);
 int option_set_by_name(char *name, char *value);
 
 void setoption(char *str);
+void set(char *str);
 void position(Pos *pos, char *str);
 
 void uci_loop(int argc, char* argv[]);

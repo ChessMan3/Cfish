@@ -1,27 +1,33 @@
 /*
-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
-  Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
-  Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
-
-  Stockfish is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
-
-  Stockfish is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
+ McBrain, a UCI chess playing engine derived from Stockfish and Glaurung 2.1
+ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
+ Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish Authors)
+ Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish Authors)
+ Copyright (C) 2017 Michael Byrne, Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (McBrain Authors)
+ 
+ Other significant contributors through their Stockfish forks:
+ Ronald De Man - SF/Cfish and Syzygy tablebase author
+ Ivan Ivec - SF/Corchess author
+ Thomas Zipproth - SF/Brainfish author (Book author)
+ 
+ McBrain is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ 
+ McBrain is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #include <assert.h>
 #include <math.h>
 #include <string.h>   // For std::memset
-#include <stdio.h>
+#include <stdio.h>    // for sleep
+#include <unistd.h>   //for sleep
 #include <inttypes.h>
 
 #include "evaluate.h"
@@ -66,11 +72,11 @@ static const int razor_margin[4] = { 0, 570, 603, 554 };
 
 // Futility and reductions lookup tables, initialized at startup
 static int FutilityMoveCounts[2][16]; // [improving][depth]
-static int Reductions[2][2][64][64];  // [pv][improving][depth][moveNumber]
+static int Reductions[2][2][128][96];  // [pv][improving][depth][moveNumber]
 
 INLINE Depth reduction(int i, Depth d, int mn, const int NT)
 {
-  return Reductions[NT][i][min(d / ONE_PLY, 63)][min(mn, 63)] * ONE_PLY;
+  return Reductions[NT][i][min(d / ONE_PLY, 127)][min(mn, 95)] * ONE_PLY;
 }
 
 // History and stats update bonus, based on depth
@@ -122,9 +128,11 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos);
 void search_init(void)
 {
   for (int imp = 0; imp <= 1; imp++)
-    for (int d = 1; d < 64; ++d)
-      for (int mc = 1; mc < 64; ++mc) {
-        double r = log(d) * log(mc) / 1.95;
+    for (int d = 1; d < 128; ++d)
+      for (int mc = 1; mc < 96; ++mc) {
+		  
+		//double r = 0.2 * d * (1.0 - exp(-9.0 / d)) * log(mc) * 1.15;
+		double r = log(d) * log(mc) / 1.89;
 
         Reductions[NonPV][imp][d][mc] = ((int)lround(r));
         Reductions[PV][imp][d][mc] = max(Reductions[NonPV][imp][d][mc] - 1, 0);
@@ -249,7 +257,21 @@ void mainthread_search(void)
         break;
       }
 
-    if (!playBookMove) {
+    if (!playBookMove)
+		{
+			if (option_value(OPT_UCI_LIMIT_STRENGTH))
+			{
+				int uci_elo = option_value(OPT_UCI_ELO);
+				int lower_elo = uci_elo - 33;
+				int upper_elo = uci_elo + 33;
+				int use_rating = rand() % (upper_elo - lower_elo ) + lower_elo;
+				int NodesToSearch   = pow(1.005958946,(((use_rating)/1450) -1 )
+										  + (use_rating - 1450)) * 32 ;
+				Limits.nodes = NodesToSearch;
+				Limits.nodes *= max(1,Time.optimumTime/1000 );
+				sleep ((Time.optimumTime/1000) * (1 - Limits.nodes/724000));
+			}
+		
       for (int idx = 1; idx < Threads.num_threads; idx++)
         thread_start_searching(Threads.pos[idx], 0);
 
@@ -338,7 +360,7 @@ void mainthread_search(void)
 
 void thread_search(Pos *pos)
 {
-  Value bestValue, alpha, beta, delta;
+  Value bestValue, alpha, beta, delta1, delta2;
   Move lastBestMove = 0;
   Depth lastBestMoveDepth = DEPTH_ZERO;
   double timeReduction = 1.0;
@@ -356,7 +378,7 @@ void thread_search(Pos *pos)
     ss[i].skipEarlyPruning = 0;
   }
 
-  bestValue = delta = alpha = -VALUE_INFINITE;
+  bestValue = delta1 = delta2 = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;
   pos->completedDepth = DEPTH_ZERO;
 
@@ -366,6 +388,10 @@ void thread_search(Pos *pos)
   }
 
   int multiPV = option_value(OPT_MULTI_PV);
+  if (option_value(OPT_TACTICAL))
+	  ;
+	multiPV = pow (2 , option_value(OPT_TACTICAL));
+	
 #if 0
   Skill skill(option_value(OPT_SKILL_LEVEL));
 
@@ -431,9 +457,11 @@ void thread_search(Pos *pos)
 
       // Reset aspiration window starting size
       if (pos->rootDepth >= 5 * ONE_PLY) {
-        delta = (Value)18;
-        alpha = max(rm->move[PVIdx].previousScore - delta,-VALUE_INFINITE);
-        beta  = min(rm->move[PVIdx].previousScore + delta, VALUE_INFINITE);
+        //delta = (Value)18;
+	delta1 = (rm->move[PVIdx].previousScore < 0) ? ((8.0 + 0.1 * abs(rm->move[PVIdx].previousScore))) : 18;
+	delta2 = (rm->move[PVIdx].previousScore > 0) ? ((8.0 + 0.1 * abs(rm->move[PVIdx].previousScore))) : 18;
+        alpha = max(rm->move[PVIdx].previousScore - delta1,-VALUE_INFINITE);
+        beta  = min(rm->move[PVIdx].previousScore + delta2, VALUE_INFINITE);
       }
 
       // Start with a small aspiration window and, in the case of a fail
@@ -472,19 +500,21 @@ void thread_search(Pos *pos)
         // re-search, otherwise exit the loop.
         if (bestValue <= alpha) {
           beta = (alpha + beta) / 2;
-          alpha = max(bestValue - delta, -VALUE_INFINITE);
+          alpha = max(bestValue - delta1, -VALUE_INFINITE);
 
           if (pos->thread_idx == 0) {
             mainThread.failedLow = 1;
             Signals.stopOnPonderhit = 0;
           }
         } else if (bestValue >= beta) {
-//          alpha = (alpha + beta) / 2;
-          beta = min(bestValue + delta, VALUE_INFINITE);
+          alpha = (alpha + beta) / 2;
+          beta = min(bestValue + delta2, VALUE_INFINITE);
         } else
           break;
 
-        delta += delta / 4 + 5;
+        //delta += delta / 4 + 5;
+		  delta1 += delta1 / 4 + 5;
+		  delta2 += delta2 / 4 + 5;
 
         assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE);
       }
@@ -514,10 +544,17 @@ skip_search:
     if (   Limits.mate
         && bestValue >= VALUE_MATE_IN_MAX_PLY
         && VALUE_MATE - bestValue <= 2 * Limits.mate)
-      Signals.stop = 1;
+        Signals.stop = 1;
 
     if (pos->thread_idx != 0)
       continue;
+
+	if (option_value(OPT_FAST_PLAY))
+	{
+		if ( time_elapsed() > time_optimum() / 256
+			&& ( abs(bestValue) > 12300 ||  abs(bestValue) >= VALUE_MATE_IN_MAX_PLY ))
+			Signals.stop = 1;
+	  }
 
 #if 0
     // If skill level is enabled and time is up, pick a sub-optimal best move
@@ -975,8 +1012,6 @@ void start_thinking(Pos *root)
   for (int idx = 0; idx < Threads.num_threads; idx++) {
     Pos *pos = Threads.pos[idx];
     pos->selDepth = 0;
-    pos->nmp_ply = 0;
-    pos->pair = -1;
     pos->rootDepth = DEPTH_ZERO;
     pos->nodes = pos->tb_hits = 0;
     RootMoves *rm = pos->rootMoves;
