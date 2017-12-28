@@ -478,7 +478,7 @@ void thread_search(Pos *pos)
             mainThread.failedLow = 1;
             Signals.stopOnPonderhit = 0;
           }
-        } else if (bestValue >= beta) {
+        } else if (bestValue >= beta && lastBestMove != rm->move[0].pv[0]) {
 //          alpha = (alpha + beta) / 2;
           beta = min(bestValue + delta, VALUE_INFINITE);
         } else
@@ -553,7 +553,7 @@ skip_search:
         unstablePvFactor *= pow(mainThread.previousTimeReduction, 0.51) / timeReduction;
 
         if (   rm->size == 1
-            || time_elapsed() > time_optimum() * unstablePvFactor * improvingFactor / 628)
+            || time_elapsed() > time_optimum() * unstablePvFactor * improvingFactor / 600)
         {
           // If we are allowed to ponder do not stop the search now but
           // keep pondering until the GUI sends "ponderhit" or "stop".
