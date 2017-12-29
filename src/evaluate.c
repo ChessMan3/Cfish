@@ -244,9 +244,8 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
 
   loop_through_pieces(Us, Pt, s) {
     // Find attacked squares, including x-ray attacks for bishops and rooks
-    b = Pt == BISHOP ? attacks_bb_bishop(s, pieces() ^ pieces_p(QUEEN))
-      : Pt == ROOK ? attacks_bb_rook(s,
-                              pieces() ^ pieces_p(QUEEN) ^ pieces_cp(Us, ROOK))
+    b = Pt == BISHOP ? attacks_bb_bishop(s, pieces() ^ pieces_cp(Us, QUEEN))
+      : Pt == ROOK ? attacks_bb_rook(s, pieces() ^ pieces_cpp(Us, ROOK, QUEEN))
                    : attacks_from(Pt, s);
 
     if (pinned_pieces(pos, Us) & sq_bb(s))
