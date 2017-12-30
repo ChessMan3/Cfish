@@ -134,15 +134,12 @@ INLINE Bitboard file_bb_s(Square s)
 }
 
 
-// shift_bb() moves a bitboard one step along direction Direction.
-INLINE Bitboard shift_bb(int Direction, Bitboard b)
+// shift_bb() moves a bitboard one step along direction Delta.
+INLINE Bitboard shift_bb(int Delta, Bitboard b)
 {
-  return  Direction == NORTH  ?  b  << 8
-        : Direction == SOUTH  ?  b  >> 8
-        : Direction == NORTH_EAST ? (b & ~FileHBB) << 9
-        : Direction == SOUTH_EAST ? (b & ~FileHBB) >> 7
-        : Direction == NORTH_WEST ? (b & ~FileABB) << 7
-        : Direction == SOUTH_WEST ? (b & ~FileABB) >> 9
+  return  Delta == DELTA_N  ?  b             << 8 : Delta == DELTA_S  ?  b             >> 8
+        : Delta == DELTA_NE ? (b & ~FileHBB) << 9 : Delta == DELTA_SE ? (b & ~FileHBB) >> 7
+        : Delta == DELTA_NW ? (b & ~FileABB) << 7 : Delta == DELTA_SW ? (b & ~FileABB) >> 9
         : 0;
 }
 

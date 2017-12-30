@@ -180,8 +180,8 @@ static void init_magics(struct MagicInit *magic_init, Bitboard *attacks[],
 static void init_sliding_attacks(void)
 {
   init_magics(rook_init, RookAttacks, RookMagics, RookMasks,
-              RookDirs, magic_index_rook);
+              RookDeltas, magic_index_rook);
   init_magics(bishop_init, BishopAttacks, BishopMagics, BishopMasks,
-              BishopDirs, magic_index_bishop);
+              BishopDeltas, magic_index_bishop);
 }
 
