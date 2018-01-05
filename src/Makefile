@@ -77,6 +77,7 @@ native = no
 numa = yes
 AVX = no
 AVX2 = no
+popcnt+ = no
 
 ### 2.2 Architecture specific
 
@@ -139,6 +140,15 @@ ifeq ($(ARCH),x86-64-avx2)
 	popcnt = yes
 	sse = yes
 	AVX2 = yes
+endif
+
+ifeq ($(ARCH),x86-64-popcnt+)
+	arch = x86_64
+	bits = 64
+	prefetch = yes
+	popcnt = yes
+	sse = yes
+	popcnt+ = yes
 endif
 
 ifeq ($(ARCH),armv7)
@@ -351,6 +361,11 @@ ifeq ($(AVX2),yes)
 		CFLAGS += -mavx2 -DUSE_AVX2
 endif
 
+### 3.10 popcnt+
+ifeq ($(popcnt+),yes)
+		CFLAGS += -DUSE_AVX
+endif
+
 ### native
 ifeq ($(native),yes)
 	CFLAGS += -march=native
@@ -366,7 +381,7 @@ ifeq ($(numa),yes)
         endif
 endif
 
-### 3.10 Link Time Optimization, it works since gcc 4.5 but not on mingw under Windows.
+### 3.11 Link Time Optimization, it works since gcc 4.5 but not on mingw under Windows.
 ### This is a mix of compile and link time options because the lto link phase
 ### needs access to the optimization flags.
 ifeq ($(comp),gcc)
@@ -389,7 +404,7 @@ ifeq ($(comp),mingw)
 	endif
 endif
 
-### 3.11 Android 5 can only run position independent executables. Note that this
+### 3.12 Android 5 can only run position independent executables. Note that this
 ### breaks Android 4.0 and earlier.
 ifeq ($(arch),armv7)
 	CFLAGS += -fPIE
