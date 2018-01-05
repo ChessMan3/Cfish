@@ -58,6 +58,7 @@ OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 # native = yes/no     --- -march=native    --- Optimize for local CPU
 # numa = yes/no       --- -DNUMA           --- Enable NUMA support
 # AVX = yes/no        --- -DUSE_AVX        --- Use AVX asm-instruction
+# AVX2 = yes/no       --- -DUSE_AVX2       --- Use AVX2 asm-instruction
 #
 # Note that Makefile is space sensitive, so when adding new architectures
 # or modifying existing flags, you have to make sure there are no extra spaces
@@ -75,6 +76,7 @@ pext = no
 native = no
 numa = yes
 AVX = no
+AVX2 = no
 
 ### 2.2 Architecture specific
 
@@ -128,6 +130,15 @@ ifeq ($(ARCH),x86-64-avx)
 	popcnt = yes
 	sse = yes
 	AVX = yes
+endif
+
+ifeq ($(ARCH),x86-64-avx2)
+	arch = x86_64
+	bits = 64
+	prefetch = yes
+	popcnt = yes
+	sse = yes
+	AVX2 = yes
 endif
 
 ifeq ($(ARCH),armv7)
@@ -332,7 +343,12 @@ endif
 
 ### 3.8 AVX
 ifeq ($(AVX),yes)
-		CFLAGS += -DUSE_AVX
+		CFLAGS += -mavx -DUSE_AVX
+endif
+
+### 3.9 AVX2
+ifeq ($(AVX2),yes)
+		CFLAGS += -mavx2 -DUSE_AVX2
 endif
 
 ### native
@@ -350,7 +366,7 @@ ifeq ($(numa),yes)
         endif
 endif
 
-### 3.8 Link Time Optimization, it works since gcc 4.5 but not on mingw under Windows.
+### 3.10 Link Time Optimization, it works since gcc 4.5 but not on mingw under Windows.
 ### This is a mix of compile and link time options because the lto link phase
 ### needs access to the optimization flags.
 ifeq ($(comp),gcc)
@@ -373,7 +389,7 @@ ifeq ($(comp),mingw)
 	endif
 endif
 
-### 3.9 Android 5 can only run position independent executables. Note that this
+### 3.11 Android 5 can only run position independent executables. Note that this
 ### breaks Android 4.0 and earlier.
 ifeq ($(arch),armv7)
 	CFLAGS += -fPIE
