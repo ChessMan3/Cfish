@@ -115,22 +115,22 @@ static const Score Outpost[][2] = {
 
 // RookOnFile[semiopen/open] contains bonuses for each rook when there is
 // no friendly pawn on the rook file.
-static const Score RookOnFile[2] = { S(20, 7), S(45, 20) };
+static const Score RookOnFile[2] = { S(21, 7), S(46, 21) };
 
 // ThreatByMinor/ByRook[attacked PieceType] contains bonuses according to
 // which piece type attacks which one. Attacks on lesser pieces which are
 // pawn defended are not considered.
 static const Score ThreatByMinor[8] = {
-  S(0, 0), S(0, 33), S(45, 43), S(46, 47), S(72,107), S(48,118)
+  S(0, 0), S(0, 33), S(44, 43), S(48, 49), S(73, 102), S(50, 121)
 };
 
 static const Score ThreatByRook[8] = {
-  S(0, 0), S(0, 25), S(40, 62), S(40, 59), S( 0, 34), S(35, 48)
+  S(0, 0), S(1, 24), S(40, 65), S(42, 60), S(-1, 32), S(33, 48)
 };
 
 // ThreatByKing[on one/on many] contains bonuses for King attacks on
 // pawns or pieces which are not pawn-defended.
-static const Score ThreatByKing[2] = { S(3, 62), S(9, 138) };
+static const Score ThreatByKing[2] = { S(4, 60), S(9, 139) };
 
 // Passed[mg/eg][Rank] contains midgame and endgame bonuses for passed pawns.
 // We don't use a Score because we process the two components independently.
@@ -178,8 +178,7 @@ static const int KingAttackWeights[8] = { 0, 0, 78, 56, 45, 11 };
 #define BishopSafeCheck   435
 #define KnightSafeCheck   790
 
-// Thresholds for lazy and space evaluation
-#define LazyThreshold 1500
+// Threshold for space evaluation
 #define SpaceThreshold 12222
 
 Score Contempt = SCORE_ZERO;
@@ -757,7 +756,7 @@ Value evaluate(const Pos *pos)
   assert(!pos_checkers());
 
   Score mobility[2] = { SCORE_ZERO, SCORE_ZERO };
-  Value v;
+  //Value v;
   EvalInfo ei;
 
   // Probe the material hash table
@@ -766,7 +765,8 @@ Value evaluate(const Pos *pos)
   // If we have a specialized evaluation function for the current material
   // configuration, call it and return.
   if (material_specialized_eval_exists(ei.me))
-    return material_evaluate(ei.me, pos) + Tempo;
+      return material_evaluate(ei.me, pos);
+    //return material_evaluate(ei.me, pos) + Tempo;
 
   // Initialize score by reading the incrementally updated scores included
   // in the position struct (material + piece square tables) and the
@@ -779,9 +779,10 @@ Value evaluate(const Pos *pos)
   score += ei.pe->score;
 
   // Early exit if score is high
-  v = (mg_value(score) + eg_value(score)) / 2;
-  if (abs(v) > LazyThreshold)
-    return (pos_stm() == WHITE ? v : -v) + Tempo;
+  //v = (mg_value(score) + eg_value(score)) / 2;
+ // if (abs(v) > LazyThreshold)
+  //  return (pos_stm() == WHITE ? v : -v) + Tempo;
+  Value v;
 
   // Initialize attack and king safety bitboards.
   evalinfo_init(pos, &ei, WHITE);
