@@ -94,8 +94,8 @@ void numa_init(void)
 
 void numa_exit(void)
 {
-  if (!numa_avail)
-    return;
+ // if (!numa_avail)
+  //  return;
 
   for (int node = 0; node < num_nodes; node++)
     free(nodemask[node]);
@@ -110,10 +110,7 @@ void read_numa_nodes(char *str)
 {
   struct bitmask *mask = NULL;
 
-  if (!numa_avail) {
-    printf("info string NUMA not supported by OS.\n");
-  }
-  else if (strcmp(str, "off") == 0) {
+ if (strcmp(str, "off") == 0) {
     delayed_settings.numa_enabled = 0;
     printf("info string NUMA disabled.\n");
   }
@@ -332,8 +329,6 @@ void numa_init(void)
 
 void numa_exit(void)
 {
-  if (!numa_avail)
-    return;
 
   free(node_number);
   if (!node_mask)
@@ -346,10 +341,7 @@ void numa_exit(void)
 
 void read_numa_nodes(char *str)
 {
-  if (!numa_avail) {
-    printf("info string NUMA not supported by OS.\n");
-  }
-  else if (strcmp(str, "off") == 0) {
+ if (strcmp(str, "off") == 0) {
     delayed_settings.numa_enabled = 0;
     printf("info string NUMA disabled.\n");
   }
