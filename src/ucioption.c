@@ -151,6 +151,8 @@ void options_init()
   // Disable the LargePages option if the machine does not support it.
   if (!large_pages_supported())
     options_map[OPT_LARGE_PAGES].type = OPT_TYPE_DISABLED;
+printf("info string Unable to allocate large pages for the "
+             "transposition table.\n");
 #endif
 #ifdef __linux__
 #ifndef MADV_HUGEPAGE
