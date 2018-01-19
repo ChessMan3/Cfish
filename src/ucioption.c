@@ -103,8 +103,8 @@ static void on_book_depth(Option *opt)
 
 static Option options_map[] = {
   { "Contempt", OPT_TYPE_SPIN, 0, -100, 100, NULL, NULL, 0, NULL },
-  { "Analysis Contempt", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
   { "Threads", OPT_TYPE_SPIN, 1, 1, MAX_THREADS, NULL, on_threads, 0, NULL },
+  { "Analysis Contempt", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
   { "Hash", OPT_TYPE_SPIN, 16, 1, MAXHASHMB, NULL, on_hash_size, 0, NULL },
   { "Clear Hash", OPT_TYPE_BUTTON, 0, 0, 0, NULL, on_clear_hash, 0, NULL },
   { "Ponder", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
@@ -125,6 +125,15 @@ static Option options_map[] = {
   { "BestBookMove", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_best_book_move, 0, NULL },
   { "BookDepth", OPT_TYPE_SPIN, 255, 1, 255, NULL, on_book_depth, 0, NULL },
   { "LargePages", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_large_pages, 0, NULL },
+  { "Wide Search", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
+  { "Clean Search", OPT_TYPE_BUTTON, 0, 0, 0, NULL, NULL, 0, NULL },
+  { "Razoring", OPT_TYPE_CHECK, 1, 0, 0, NULL, NULL, 0, NULL },
+  { "Futility", OPT_TYPE_CHECK, 1, 0, 0, NULL, NULL, 0, NULL },
+  { "Pruning", OPT_TYPE_CHECK, 1, 0, 0, NULL, NULL, 0, NULL },
+  { "NullMove", OPT_TYPE_CHECK, 1, 0, 0, NULL, NULL, 0, NULL },
+  { "ProbCut", OPT_TYPE_CHECK, 1, 0, 0, NULL, NULL, 0, NULL },
+  { "KingSafe", OPT_TYPE_SPIN, 100, 100, 1500, NULL, NULL, 0, NULL },
+  { "Tactical", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
   { "NUMA", OPT_TYPE_STRING, 0, 0, 0, "all", on_numa, 0, NULL },
   { NULL }
 };

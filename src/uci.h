@@ -60,7 +60,16 @@ typedef void (*OnChange)(Option *);
 #define OPT_BOOK_BEST_MOVE    20
 #define OPT_BOOK_DEPTH        21
 #define OPT_LARGE_PAGES       22
-#define OPT_NUMA              23
+#define OPT_WIDESEARCH        23
+#define OPT_CLEAN_SEARCH      24
+#define OPT_RAZORING          25
+#define OPT_FUTILITY          26
+#define OPT_PRUNING           27
+#define OPT_NULLMOVE          28
+#define OPT_PROBCUT           29
+#define OPT_KingSafe          30
+#define OPT_Tactical          31
+#define OPT_NUMA              32
 
 struct Option {
   char *name;

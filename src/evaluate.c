@@ -25,6 +25,7 @@
 #include "evaluate.h"
 #include "material.h"
 #include "pawns.h"
+#include "uci.h"
 
 #define Center      ((FileDBB | FileEBB) & (Rank4BB | Rank5BB))
 #define QueenSide   (FileABB | FileBBB | FileCBB | FileDBB)
@@ -359,8 +360,7 @@ INLINE Score evaluate_pieces(const Pos *pos, EvalInfo *ei, Score *mobility)
 
 // evaluate_king() assigns bonuses and penalties to a king of a given color.
 
-INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
-                           int Us)
+INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility, int Us)
 {
   const int Them = (Us == WHITE ? BLACK   : WHITE);
   const Bitboard Camp = (   Us == WHITE
@@ -420,6 +420,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
     // Enemy knights checks
     b = attacks_from_knight(ksq) & ei->attackedBy[Them][KNIGHT];
     if (b & safe)
+
       kingDanger += KnightSafeCheck;
     else
       unsafeChecks |= b;
@@ -436,12 +437,17 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                  -   9 * mg_value(score) / 8
                  + 40;
 
+    int KingSafe = option_value(OPT_KingSafe) / 100;
+    if (option_value(OPT_Tactical))
+    KingSafe = 5;
+    
     // Transform the kingDanger units into a Score, and subtract it from
     // the evaluation.
-    if (kingDanger > 0) {
-      int mobilityDanger = mg_value(mobility[Them] - mobility[Us]);
-      kingDanger = max(0, kingDanger + mobilityDanger);
-      score -= make_score(kingDanger * kingDanger / 4096, kingDanger / 16);
+    if (kingDanger > 0)
+    {
+        int mobilityDanger = mg_value(mobility[Them] - mobility[Us]);
+        kingDanger = max(0, kingDanger + mobilityDanger);
+        score -= make_score(kingDanger * KingSafe * kingDanger / 4096, kingDanger / 16);
     }
   }
 
