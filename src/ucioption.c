@@ -21,6 +21,7 @@
 #define _GNU_SOURCE
 
 #include <assert.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -102,8 +103,9 @@ static void on_book_depth(Option *opt)
 #endif
 
 static Option options_map[] = {
-  { "Contempt", OPT_TYPE_SPIN, 20, -100, 100, NULL, NULL, 0, NULL },
-  { "Analysis Contempt", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
+  { "Contempt", OPT_TYPE_SPIN, 18, -100, 100, NULL, NULL, 0, NULL },
+  { "Analysis Contempt", OPT_TYPE_COMBO, 0, 0, 0,
+    "Off var Off var White var Black", NULL, 0, NULL },
   { "Threads", OPT_TYPE_SPIN, 1, 1, MAX_THREADS, NULL, on_threads, 0, NULL },
   { "Hash", OPT_TYPE_SPIN, 16, 1, MAXHASHMB, NULL, on_hash_size, 0, NULL },
   { "Clear Hash", OPT_TYPE_BUTTON, 0, 0, 0, NULL, on_clear_hash, 0, NULL },
@@ -135,6 +137,9 @@ static Option options_map[] = {
 
 void options_init()
 {
+  char *s;
+  size_t len;
+
 #ifdef NUMA
   // On a non-NUMA machine, disable the NUMA option to diminish confusion.
   if (!numa_avail)
@@ -152,6 +157,10 @@ void options_init()
   options_map[OPT_LARGE_PAGES].type = OPT_TYPE_DISABLED;
 #endif
 #endif
+  if (sizeof(size_t) < 8) {
+    options_map[OPT_SYZ_PROBE_LIMIT].def = 5;
+    options_map[OPT_SYZ_PROBE_LIMIT].max_val = 5;
+  }
   for (Option *opt = options_map; opt->name != NULL; opt++) {
     if (opt->type == OPT_TYPE_DISABLED)
       continue;
@@ -164,6 +173,15 @@ void options_init()
     case OPT_TYPE_STRING:
       opt->val_string = malloc(strlen(opt->def_string) + 1);
       strcpy(opt->val_string, opt->def_string);
+      break;
+    case OPT_TYPE_COMBO:
+      s = strstr(opt->def_string, " var");
+      len = strlen(opt->def_string) - strlen(s);
+      opt->val_string = malloc(len + 1);
+      strncpy(opt->val_string, opt->def_string, len);
+      opt->val_string[len] = 0;
+      for (s = opt->val_string; *s; s++)
+        *s = tolower(*s);
       break;
     }
     if (opt->on_change)
@@ -180,7 +198,7 @@ void options_free(void)
 
 static char *opt_type_str[] =
 {
-  "check", "spin", "button", "string"
+  "check", "spin", "button", "string", "combo"
 };
 
 // print_options() prints all options in the format required by the
@@ -201,6 +219,7 @@ void print_options(void)
     case OPT_TYPE_BUTTON:
       break;
     case OPT_TYPE_STRING:
+    case OPT_TYPE_COMBO:
       printf(" default %s", opt->def_string);
       break;
     }
@@ -214,7 +233,7 @@ int option_value(int opt_idx)
   return options_map[opt_idx].value;
 }
 
-char *option_string_value(int opt_idx)
+const char *option_string_value(int opt_idx)
 {
   return options_map[opt_idx].val_string;
 }
@@ -256,6 +275,12 @@ int option_set_by_name(char *name, char *value)
         opt->val_string = malloc(strlen(value) + 1);
         strcpy(opt->val_string, value);
         break;
+      case OPT_TYPE_COMBO:
+        free(opt->val_string);
+        opt->val_string = malloc(strlen(value) + 1);
+        strcpy(opt->val_string, value);
+        for (char *s = opt->val_string; *s; s++)
+          *s = tolower(*s);
       }
       if (opt->on_change)
         opt->on_change(opt);

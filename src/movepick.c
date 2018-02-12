@@ -183,13 +183,13 @@ Move next_move(const Pos *pos, int skipQuiets)
     /* fallthrough */
 
   case ST_QUIET:
-    while (    st->cur < st->endMoves
-           && (!skipQuiets || st->cur->value >= 0)) {
-      move = (st->cur++)->move;
-      if (   move != st->ttMove && move != st->mp_killers[0]
-          && move != st->mp_killers[1] && move != st->countermove)
-        return move;
-    }
+    if (!skipQuiets)
+      while (st->cur < st->endMoves) {
+        move = (st->cur++)->move;
+        if (   move != st->ttMove && move != st->mp_killers[0]
+            && move != st->mp_killers[1] && move != st->countermove)
+          return move;
+      }
     st->stage++;
     st->cur = (st-1)->endMoves; // Return to bad captures.
     /* fallthrough */
@@ -239,13 +239,12 @@ Move next_move(const Pos *pos, int skipQuiets)
   case ST_RECAPTURES_GEN:
     st->cur = (st-1)->endMoves;
     st->endMoves = generate_captures(pos, st->cur);
-    score_captures(pos);
     st->stage++;
     /* fallthrough */
 
   case ST_RECAPTURES:
     while (st->cur < st->endMoves) {
-      move = pick_best(st->cur++, st->endMoves);
+      move = (st->cur++)->move;
       if (to_sq(move) == st->recaptureSquare)
         return move;
     }
