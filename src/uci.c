@@ -164,12 +164,8 @@ void go(Pos *pos, char *str)
 
   process_delayed_settings();
 
+  Limits = (struct LimitsType){ 0 };
   Limits.startTime = now(); // As early as possible!
-
-  Limits.time[0] = Limits.time[1] = Limits.inc[0] = Limits.inc[1] = 0;
-  Limits.npmsec = Limits.movestogo = Limits.depth = Limits.movetime = 0;
-  Limits.mate = Limits.infinite = Limits.ponder = Limits.num_searchmoves = 0;
-  Limits.nodes = 0;
 
   for (token = strtok(str, " \t"); token; token = strtok(NULL, " \t")) {
     if (strcmp(token, "searchmoves") == 0)
@@ -331,11 +327,16 @@ void uci_loop(int argc, char **argv)
       fflush(stdout);
     }
     else if (strcmp(token, "go") == 0)        go(&pos, str);
-    else if (strcmp(token, "position") == 0)  position(&pos, str);
+    else if (strcmp(token, "position") == 0) {
+           position(&pos, str);
+         if (option_value(OPT_CLEAN_SEARCH))
+         search_clear();
+    } 
     else if (strcmp(token, "setoption") == 0) setoption(str);
 
     // Additional custom non-UCI commands, useful for debugging
     else if (strcmp(token, "bench") == 0)     benchmark(&pos, str);
+    else if (strcmp(token, "b") == 0)     benchmark(&pos, str);
     else if (strcmp(token, "d") == 0)         print_pos(&pos);
     else if (strcmp(token, "perft") == 0) {
       sprintf(str_buf, "%d %d %d current perft", option_value(OPT_HASH),
@@ -441,4 +442,3 @@ Move uci_to_move(const Pos *pos, char *str)
 
   return 0;
 }
-

@@ -30,7 +30,7 @@
 
 // Version number. If Version is left empty, then compile date in the format
 // DD-MM-YY and show in engine_info.
-char Version[] = "";
+char Version[] = "R";
 
 #ifndef __WIN32__
 pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -66,9 +66,9 @@ void print_engine_info(int to_uci)
     printf("%02d%02d%02d", day, month, year % 100);
   }
 
-  printf("%s%s%s%s\n", Is64Bit ? " 64" : ""
-                     , HasPext ? " BMI2" : (HasPopCnt ? " POPCNT" : "")
-                     , HasNuma ? " NUMA" : ""
+  printf("%s%s%s%s\n", Is64Bit ? " x64" : " x32"
+                     , HasPext ? " BMI2" : ( USE_AVX2 ? " AVX2" :( USE_AVX ? " AVX" : (HasPopCnt ? " POPCNT" : "")))
+                     , HasNuma ? " N" : ""
                      , to_uci ? "\nid author T. Romstad, M. Costalba, "
                                 "J. Kiiski, G. Linscott"
                               : " by Syzygy based on Stockfish");

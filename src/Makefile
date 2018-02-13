@@ -58,6 +58,8 @@ OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 # native = yes/no     --- -march=native    --- Optimize for local CPU
 # numa = yes/no       --- -DNUMA           --- Enable NUMA support
 # lto = yes/no        --- -flto            --- Enable link-time optimization
+# AVX = yes/no        --- -DUSE_AVX        --- Use AVX asm-instruction
+# AVX2 = yes/no       --- -DUSE_AVX2       --- Use AVX2 asm-instruction
 #
 # Note that Makefile is space sensitive, so when adding new architectures
 # or modifying existing flags, you have to make sure there are no extra spaces
@@ -66,16 +68,18 @@ OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 ### 2.1. General and architecture defaults
 debug = no
 optimize = yes
-arch = x86_64
-bits = 64
-prefetch = yes
-popcnt = yes
-sse = yes
+arch = x86_32
+bits = 32
+prefetch = no
+popcnt = no
+sse = no
 pext = no
-native = yes
-numa = yes
-lto = no
+native = no
+numa = no
+lto = yes
 extra = no
+AVX = no
+AVX2 = no
 
 ### 2.2 Architecture specific
 
@@ -123,6 +127,24 @@ ifeq ($(ARCH),x86-64-bmi2)
 	pext = yes
 endif
 
+ifeq ($(ARCH),x86-64-avx)
+	arch = x86_64
+	bits = 64
+	prefetch = yes
+	popcnt = yes
+	sse = yes
+	AVX = yes
+endif
+
+ifeq ($(ARCH),x86-64-avx2)
+	arch = x86_64
+	bits = 64
+	prefetch = yes
+	popcnt = yes
+	sse = yes
+	AVX2 = yes
+endif
+
 ifeq ($(ARCH),armv7)
 	arch = armv7
 	prefetch = yes
@@ -166,11 +188,11 @@ ifeq ($(COMP),mingw)
 
 	ifeq ($(UNAME),Linux)
 		ifeq ($(bits),64)
-#			ifeq ($(shell which x86_64-w64-mingw32-cc-posix),)
+			ifeq ($(shell which x86_64-w64-mingw32-cc-posix),)
 				CC=x86_64-w64-mingw32-gcc
-#			else
-#				CC=x86_64-w64-mingw32-cc-posix
-#			endif
+			else
+				CC=x86_64-w64-mingw32-cc-posix
+			endif
 		else
 			ifeq ($(shell which i686-w64-mingw32-cc-posix),)
 				CC=i686-w64-mingw32-cc
@@ -183,7 +205,7 @@ ifeq ($(COMP),mingw)
 	endif
 
 	CFLAGS += -Wextra -Wshadow
-	LDFLAGS += #-static
+	LDFLAGS += -static
 endif
 
 ifeq ($(COMP),icc)
@@ -324,6 +346,16 @@ ifeq ($(pext),yes)
 	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
 		CFLAGS += -mbmi2
 	endif
+endif
+
+### AVX
+ifeq ($(AVX),yes)
+		CFLAGS += -mavx -DUSE_AVX
+endif
+
+### AVX2
+ifeq ($(AVX2),yes)
+		CFLAGS += -mavx2 -DUSE_AVX2
 endif
 
 ### native

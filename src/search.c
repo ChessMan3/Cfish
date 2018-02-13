@@ -142,7 +142,7 @@ void search_init(void)
 
 // search_clear() resets search state to zero, to obtain reproducible results
 
-void search_clear()
+void search_clear(void)
 {
   if (!settings.tt_size) {
     delayed_settings.clear = 1;
@@ -372,6 +372,7 @@ void thread_search(Pos *pos)
   }
 
   int multiPV = option_value(OPT_MULTI_PV);
+  if (option_value(OPT_WIDESEARCH)) multiPV=256;
 #if 0
   Skill skill(option_value(OPT_SKILL_LEVEL));
 
@@ -994,4 +995,3 @@ void start_thinking(Pos *root)
   Signals.searching = 1;
   thread_start_searching(threads_main(), 0);
 }
-
