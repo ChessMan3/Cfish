@@ -182,7 +182,7 @@ static const int KingAttackWeights[8] = { 0, 0, 78, 56, 45, 11 };
 #define KnightSafeCheck   790
 
 // Thresholds for lazy and space evaluation
-#define LazyThreshold 1500
+#define LazyThreshold VALUE_KNOWN_WIN
 #define SpaceThreshold 12222
 
 _Atomic Score Contempt = SCORE_ZERO;
@@ -768,7 +768,7 @@ Value evaluate(const Pos *pos)
   assert(!pos_checkers());
 
   Score mobility[2] = { SCORE_ZERO, SCORE_ZERO };
-  Value v;
+  //Value v;
   EvalInfo ei;
 
   // Probe the material hash table
@@ -791,7 +791,7 @@ Value evaluate(const Pos *pos)
   score += ei.pe->score;
 
   // Early exit if score is high
-  v = (mg_value(score) + eg_value(score)) / 2;
+  Value v = (mg_value(score) + eg_value(score)) / 2;
   if (abs(v) > LazyThreshold)
     return (pos_stm() == WHITE ? v : -v) + Tempo;
 
