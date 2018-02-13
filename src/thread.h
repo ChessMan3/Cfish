@@ -46,12 +46,20 @@
 #define UNLOCK(x) ReleaseMutex(x)
 #endif
 
+enum {
+  THREAD_SLEEP,
+  THREAD_SEARCH,
+  THREAD_TT_CLEAR,
+  THREAD_EXIT,
+  THREAD_RESUME
+};
+
 void thread_init(void *arg);
 void thread_create(int idx);
 void thread_search(Pos *pos);
 void thread_idle_loop(Pos *pos);
-void thread_start_searching(Pos *pos, int resume);
-void thread_wait_for_search_finished(Pos *pos);
+void thread_wake_up(Pos *pos, int action);
+void thread_wait_until_sleeping(Pos *pos);
 void thread_wait(Pos *pos, atomic_bool *b);
 
 
@@ -67,7 +75,7 @@ typedef struct MainThread MainThread;
 
 extern MainThread mainThread;
 
-void mainthread_search();
+void mainthread_search(void);
 
 
 // ThreadPool struct handles all the threads-related stuff like init,
@@ -106,4 +114,3 @@ CounterMoveHistoryStat **cmh_tables;
 int num_cmh_tables;
 
 #endif
-
