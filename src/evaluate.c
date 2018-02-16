@@ -115,7 +115,7 @@ static const Score Outpost[][2] = {
 
 // RookOnFile[semiopen/open] contains bonuses for each rook when there is
 // no friendly pawn on the rook file.
-static const Score RookOnFile[2] = { S(20, 7), S(45, 20) };
+static const Score RookOnFile[2] = { S(21, 7), S(46, 21) };
 
 // ThreatByMinor/ByRook[attacked PieceType] contains bonuses according to
 // which piece type attacks which one. Attacks on lesser pieces which are
@@ -184,7 +184,7 @@ enum {
 };
 
 // Thresholds for lazy and space evaluation
-enum { LazyThreshold = 1500, SpaceThreshold = 12222 };
+enum { LazyThreshold = VALUE_KNOWN_WIN, SpaceThreshold = 12222 };
 
 _Atomic Score Contempt = SCORE_ZERO;
 
@@ -767,7 +767,7 @@ Value evaluate(const Pos *pos)
   assert(!pos_checkers());
 
   Score mobility[2] = { SCORE_ZERO, SCORE_ZERO };
-  Value v;
+  //Value v;
   EvalInfo ei;
 
   // Probe the material hash table
@@ -790,7 +790,7 @@ Value evaluate(const Pos *pos)
   score += ei.pe->score;
 
   // Early exit if score is high
-  v = (mg_value(score) + eg_value(score)) / 2;
+  Value v = (mg_value(score) + eg_value(score)) / 2;
   if (abs(v) > LazyThreshold)
     return (pos_stm() == WHITE ? v : -v) + Tempo;
 
