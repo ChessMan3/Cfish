@@ -30,7 +30,7 @@
 
 // Version number. If Version is left empty, then compile date in the format
 // DD-MM-YY and show in engine_info.
-char Version[] = "Ext";
+char Version[] = "";
 
 #ifndef __WIN32__
 pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -50,7 +50,7 @@ void print_engine_info(int to_uci)
 {
   char my_date[64];
 
-  printf("CFish %s", Version);
+  printf("CiChess 2.0 %s", Version);
 
   if (strlen(Version) == 0) {
     int day, month, year;
@@ -71,7 +71,7 @@ void print_engine_info(int to_uci)
                      , HasNuma ? " N" : ""
                      , to_uci ? "\nid author T. Romstad, M. Costalba, "
                                 "J. Kiiski, G. Linscott"
-                              : " by Syzygy based on Stockfish, compiled by ChessMan3");
+                              : " by ChessMan3 based on CFish and CorChess");
   fflush(stdout);
 }
 

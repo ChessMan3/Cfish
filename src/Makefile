@@ -25,7 +25,7 @@
 UNAME = $(shell uname)
 
 ### Executable name
-EXE = cfish
+EXE = CiChess
 
 ### Installation dir definitions
 PREFIX = /usr/local
@@ -75,7 +75,7 @@ popcnt = no
 sse = no
 pext = no
 native = no
-numa = no
+numa = yes
 lto = no
 extra = no
 AVX = no
