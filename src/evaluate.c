@@ -115,7 +115,7 @@ static const Score Outpost[][2] = {
 
 // RookOnFile[semiopen/open] contains bonuses for each rook when there is
 // no friendly pawn on the rook file.
-static const Score RookOnFile[2] = { S(21, 7), S(46, 21) };
+static const Score RookOnFile[2] = { S(20, 7), S(45, 20) };
 
 // ThreatByMinor/ByRook[attacked PieceType] contains bonuses according to
 // which piece type attacks which one. Attacks on lesser pieces which are
