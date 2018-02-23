@@ -236,13 +236,15 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 8. Null move search with verification search (is omitted in PV nodes)
   if (   !PvNode
       && eval >= beta
-      && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
+      && (ss->staticEval >= beta - (int)(320 * log(depth / ONE_PLY)) + 500)
+      &&  pos->selDepth + 6 > pos->rootDepth / ONE_PLY
+      &&  pos_non_pawn_material(pos_stm()) > BishopValueMg
       && (ss->ply >= pos->nmp_ply || ss->ply % 2 != pos->nmp_odd))
   {
     assert(eval - beta >= 0);
 
     // Null move dynamic reduction based on depth and value
-    Depth R = ((823 + 67 * depth / ONE_PLY) / 256 + min((eval - beta) / PawnValueMg, 3)) * ONE_PLY;
+    Depth R = ((int)(2.6 * log(depth / ONE_PLY)) + min((eval - beta) / (Value)170, 3)) * ONE_PLY;
 
     ss->currentMove = MOVE_NULL;
     ss->history = &(*pos->counterMoveHistory)[0][0];

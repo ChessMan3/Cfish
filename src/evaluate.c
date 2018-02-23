@@ -183,7 +183,7 @@ enum {
 };
 
 // Thresholds for lazy and space evaluation
-enum { LazyThreshold = 1500, SpaceThreshold = 12222 };
+enum { LazyThreshold = VALUE_KNOWN_WIN, SpaceThreshold = 12222 };
 
 _Atomic Score Contempt = SCORE_ZERO;
 
