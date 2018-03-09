@@ -209,6 +209,10 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
              ss->staticEval, tt_generation());
   }
 
+  improving =   ss->staticEval >= (ss-2)->staticEval
+          /* || ss->staticEval == VALUE_NONE Already implicit in the previous condition */
+             ||(ss-2)->staticEval == VALUE_NONE;
+
   if (ss->skipEarlyPruning || !pos_non_pawn_material(pos_stm()))
     goto moves_loop;
 
@@ -232,7 +236,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 8. Futility pruning: child node (skipped when in check)
   if (   !rootNode
       &&  depth < 7 * ONE_PLY
-      &&  eval - futility_margin(depth) >= beta
+      &&  eval - futility_margin(depth, improving) >= beta
       &&  eval < VALUE_KNOWN_WIN)  // Do not return unproven wins
     return eval; // - futility_margin(depth); (do not do the right thing)
 
