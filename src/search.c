@@ -442,10 +442,7 @@ void thread_search(Pos *pos)
         int ct = option_value(OPT_CONTEMPT) * PawnValueEg / 100;
 
         // Adjust contempt based on current situation
-		int sign = (bestValue > 0) - (bestValue < 0);
-        ct +=  bestValue >  500 ?  70 :
-               bestValue < -500 ? -70 :
-               bestValue / 10 + sign * (int)(round(3.22 * log(1 + abs(bestValue))));
+		ct += (int)(round(48 * atan((float)(bestValue) / 128)));
 
         store_rlx(Contempt, pos_stm() == WHITE ?  make_score(ct, ct / 2)
                                                : -make_score(ct, ct / 2));
