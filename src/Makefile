@@ -281,9 +281,15 @@ ifeq ($(optimize),yes)
 
 	CFLAGS += -O3
 
-	ifeq ($(comp),gcc)
+	ifeq ($(comp),mingw)
 		ifeq ($(extra),yes)
 			CFLAGS += -fira-loop-pressure -fconserve-stack -fmodulo-sched -fmodulo-sched-allow-regmoves -fsched-pressure -flimit-function-alignment
+		endif
+	endif
+	
+	ifeq ($(comp),gcc)
+		ifeq ($(extra),yes)
+			CFLAGS += -fira-loop-pressure -fconserve-stack -fmodulo-sched -fmodulo-sched-allow-regmoves -fsched-pressure
 		endif
 
 		ifeq ($(OS),Android)
@@ -351,7 +357,7 @@ endif
 ifeq ($(lto),yes)
 ifeq ($(optimize),yes)
 ifeq ($(debug),no)
-	ifeq ($(comp),$(filter $(comp),gcc clang))
+	ifeq ($(comp),$(filter $(comp),gcc mingw clang))
 		CFLAGS += -flto
 		LDFLAGS += $(CFLAGS)
 	endif

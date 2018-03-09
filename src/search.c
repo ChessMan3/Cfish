@@ -439,10 +439,14 @@ void thread_search(Pos *pos)
         alpha = max(rm->move[PVIdx].previousScore - delta,-VALUE_INFINITE);
         beta  = min(rm->move[PVIdx].previousScore + delta, VALUE_INFINITE);
 
+        int ct = option_value(OPT_CONTEMPT) * PawnValueEg / 100;
+
         // Adjust contempt based on current situation
-        int ct = base_ct + (  bestValue >  500 ?  50
-                            : bestValue < -500 ? -50
-                            : bestValue / 10);
+		int sign = (bestValue > 0) - (bestValue < 0);
+        ct +=  bestValue >  500 ?  70 :
+               bestValue < -500 ? -70 :
+               bestValue / 10 + sign * (int)(round(3.22 * log(1 + abs(bestValue))));
+
         store_rlx(Contempt, pos_stm() == WHITE ?  make_score(ct, ct / 2)
                                                : -make_score(ct, ct / 2));
       }
