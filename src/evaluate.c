@@ -166,6 +166,7 @@ static const Score WeakUnopposedPawn     = S(  5, 25);
 static const Score ThreatByPawnPush      = S( 47, 26);
 static const Score ThreatByAttackOnQueen = S( 42, 21);
 static const Score HinderPassedPawn      = S(  8,  1);
+static const Score KnightOnQueen         = S( 21, 11);
 static const Score TrappedBishopA1H1     = S( 50, 50);
 
 #undef S
@@ -563,6 +564,17 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
      | (ei->attackedBy[Us][ROOK  ] & ei->attackedBy[Them][QUEEN] & ~ei->attackedBy[Them][QUEEN_DIAGONAL]);
 
   score += ThreatByAttackOnQueen * popcount(b & safeThreats);
+  
+  // Bonus for knight threats on the next moves against enemy queen
+  if (piece_count(Them, QUEEN) == 1)
+  {
+      b =  attacks_from_knight(square_of(Them, QUEEN))
+         & ei->attackedBy[Us][KNIGHT]
+         & ~pieces_cpp(Us, PAWN, KING)
+         & ~stronglyProtected;
+
+      score += KnightOnQueen * popcount(b);
+  }
 
   return score;
 }
