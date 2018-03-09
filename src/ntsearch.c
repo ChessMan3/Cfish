@@ -213,20 +213,20 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     goto moves_loop;
 
   // Step 7. Razoring (skipped when in check)
-  if (   !PvNode
-      && depth <= ONE_PLY)
+  if (  !PvNode
+      && depth <= 2 * ONE_PLY)
   {
-    if (eval + RazorMargin1 <= alpha)
+    if (   depth == ONE_PLY
+        && eval + RazorMargin1 <= alpha)
       return qsearch_NonPV_false(pos, ss, alpha, DEPTH_ZERO);
-  }
-  else if (   !PvNode
-           && depth <= 2 * ONE_PLY
-           && eval + RazorMargin2 <= alpha)
-  {
+
+  else if (eval + RazorMargin2 <= alpha)
+   {
     Value ralpha = alpha - RazorMargin2;
     Value v = qsearch_NonPV_false(pos, ss, ralpha, DEPTH_ZERO);
     if (v <= ralpha)
       return v;
+   }
   }
 
   // Step 8. Futility pruning: child node (skipped when in check)
