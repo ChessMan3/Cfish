@@ -44,7 +44,7 @@ struct EvalInfo {
   Bitboard mobilityArea[2];
 
   // attackedBy[color][piece type] is a bitboard representing all squares
-  // attacked by a given color and piece type. A special "piece type" which
+  // attacked by a given color and piece type. Special "piece types" which
   // is also calculated is ALL_PIECES.
   Bitboard attackedBy[2][8];
 
@@ -151,24 +151,24 @@ const int RankFactor[8] = { 0, 0, 0, 2, 7, 12, 19 };
 const Score KingProtector[] = { S(-3, -5), S(-4, -3), S(-3, 0), S(-1, 1) };
 
 // Assorted bonuses and penalties used by evaluation
-static const Score BishopPawns       = S(  8, 12);
-static const Score CloseEnemies      = S(  7,  0);
-static const Score Connectivity      = S(  2,  2);
-static const Score Hanging           = S( 52, 30);
-static const Score HinderPassedPawn  = S(  8,  1);
-static const Score KnightOnQueen     = S( 21, 11);
-static const Score LongRangedBishop  = S( 22,  0);
-static const Score MinorBehindPawn   = S( 16,  0);
-static const Score PawnlessFlank     = S( 20, 80);
-static const Score RookOnPawn        = S(  8, 24);
-static const Score SliderOnQueen     = S( 42, 21);
-static const Score ThreatByPawnPush  = S( 47, 26);
-static const Score ThreatByRank      = S( 16,  3);
-static const Score ThreatBySafePawn  = S(175,168);
-static const Score TrappedBishopA1H1 = S( 50, 50);
-static const Score TrappedRook       = S( 92,  0);
-static const Score WeakQueen         = S( 50, 10);
-static const Score WeakUnopposedPawn = S(  5, 25);
+static const Score MinorBehindPawn       = S( 16,  0);
+static const Score BishopPawns           = S(  8, 12);
+static const Score LongRangedBishop      = S( 22,  0);
+static const Score RookOnPawn            = S(  8, 24);
+static const Score SliderOnQueen         = S( 42, 21);
+static const Score TrappedRook           = S( 92,  0);
+static const Score WeakQueen             = S( 50, 10);
+static const Score CloseEnemies          = S(  7,  0);
+static const Score Connectivity          = S(  2,  2);
+static const Score PawnlessFlank         = S( 20, 80);
+static const Score ThreatBySafePawn      = S(175,168);
+static const Score ThreatByRank          = S( 16,  3);
+static const Score Hanging               = S( 52, 30);
+static const Score WeakUnopposedPawn     = S(  5, 25);
+static const Score ThreatByPawnPush      = S( 47, 26);
+static const Score HinderPassedPawn      = S(  8,  1);
+static const Score KnightOnQueen         = S( 21, 11);
+static const Score TrappedBishopA1H1     = S( 50, 50);
 
 #undef S
 #undef V
@@ -553,22 +553,23 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 
   score += ThreatByPawnPush * popcount(b);
 
-  // Bonus for impending threats against enemy queen
-  if (piece_count(Them, QUEEN) == 1) {
-    uint32_t s = square_of(Them, QUEEN);
-    safeThreats = ei->mobilityArea[Us] & ~stronglyProtected;
+  // Bonus for threats on the next moves against enemy queen
+  if (piece_count(Them, QUEEN) == 1)
+  {
+      Square s = square_of(Them, QUEEN);
+      safeThreats = ei->mobilityArea[Us] & ~stronglyProtected;
 
-    b = ei->attackedBy[Us][KNIGHT] & attacks_from_knight(s);
+      b = ei->attackedBy[Us][KNIGHT] & attacks_from_knight(s);
 
-    score += KnightOnQueen * popcount(b & safeThreats);
+      score += KnightOnQueen * popcount(b & safeThreats);
 
-    b =  (ei->attackedBy[Us][BISHOP] & attacks_from_bishop(s))
-       | (ei->attackedBy[Us][ROOK  ] & attacks_from_rook(s));
+      b =  (ei->attackedBy[Us][BISHOP] & attacks_from_bishop(s))
+         | (ei->attackedBy[Us][ROOK  ] & attacks_from_rook(s));
 
-    score += SliderOnQueen * popcount(b & safeThreats & ei->attackedBy2[Us]);
+      score += SliderOnQueen * popcount(b & safeThreats & ei->attackedBy2[Us]);
   }
 
-  // Bonus for protected knights, bishops, rooks and queens
+  // Connectivity: ensure that knights, bishops, rooks, and queens are protected
   b = (pieces_c(Us) ^ pieces_cpp(Us, PAWN, KING)) & ei->attackedBy[Us][0];
   score += Connectivity * popcount(b);
 
@@ -695,11 +696,7 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
   behind |= (Us == WHITE ? behind >>  8 : behind <<  8);
   behind |= (Us == WHITE ? behind >> 16 : behind << 16);
 
-  // Since SpaceMask[Us] is fully on our half of the board...
-  assert((unsigned)(safe >> (Us == WHITE ? 32 : 0)) == 0);
-
-  // ...count safe + (behind & safe) with a single popcount.
-  int bonus = popcount((Us == WHITE ? safe << 32 : safe >> 32) | (behind & safe));
+  int bonus = popcount(safe) + popcount(behind & safe);
   int weight = popcount(pieces_c(Us)) - 2 * ei->pe->openFiles;
 
   return make_score(bonus * weight * weight / 16, 0);
