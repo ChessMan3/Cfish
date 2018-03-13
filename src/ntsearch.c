@@ -190,7 +190,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 6. Evaluate the position statically
   if (inCheck) {
     ss->staticEval = VALUE_NONE;
-	improving = 1;
+    improving = 1;
     goto moves_loop;
   } else if (ttHit) {
     // Never assume anything on values stored in TT
@@ -211,7 +211,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   }
 
   improving =   ss->staticEval >= (ss-2)->staticEval
-             ||(ss-2)->staticEval == VALUE_NONE;
+             || (ss-2)->staticEval == VALUE_NONE;
 
   if (ss->skipEarlyPruning || !pos_non_pawn_material(pos_stm()))
     goto moves_loop;

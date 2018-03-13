@@ -62,7 +62,9 @@ static const int skipPhase[20] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3
 static const int RazorMargin1 = 590;
 static const int RazorMargin2 = 604;
 
-#define futility_margin(d, improving) ((Value)((175 - 50 * improving) * (d) / ONE_PLY))
+INLINE int futility_margin(Depth d, int improving) {
+  return (175 - 50 * improving) * d / ONE_PLY;
+}
 
 // Futility and reductions lookup tables, initialized at startup
 static int FutilityMoveCounts[2][16]; // [improving][depth]
