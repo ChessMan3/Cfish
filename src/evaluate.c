@@ -159,6 +159,7 @@ static const Score SliderOnQueen         = S( 42, 21);
 static const Score TrappedRook           = S( 92,  0);
 static const Score WeakQueen             = S( 50, 10);
 static const Score CloseEnemies          = S(  7,  0);
+static const Score Connectivity          = S(  3,  1);
 static const Score PawnlessFlank         = S( 20, 80);
 static const Score ThreatBySafePawn      = S(175,168);
 static const Score ThreatByRank          = S( 16,  3);
@@ -555,7 +556,7 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
   // Bonus for threats on the next moves against enemy queen
   if (piece_count(Them, QUEEN) == 1)
   {
-      Square s = square_of(Them, QUEEN);
+      uint32_t s = square_of(Them, QUEEN);
       safeThreats = ei->mobilityArea[Us] & ~stronglyProtected;
 
       b = ei->attackedBy[Us][KNIGHT] & attacks_from_knight(s);
@@ -567,6 +568,10 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 
       score += SliderOnQueen * popcount(b & safeThreats & ei->attackedBy2[Us]);
   }
+
+  // Connectivity: ensure that knights, bishops, rooks, and queens are protected
+  b = (pieces_c(Us) ^ pieces_cpp(Us, PAWN, KING)) & ei->attackedBy[Us][0];
+  score += Connectivity * popcount(b);
 
   return score;
 }

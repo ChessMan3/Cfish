@@ -62,7 +62,9 @@ static const int skipPhase[20] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3
 static const int RazorMargin1 = 590;
 static const int RazorMargin2 = 604;
 
-#define futility_margin(d, improving) ((Value)((175 - 50 * improving) * (d) / ONE_PLY))
+INLINE int futility_margin(Depth d, int improving) {
+return (175 - 50 * improving) * d / ONE_PLY;
+}
 
 // Futility and reductions lookup tables, initialized at startup
 static int FutilityMoveCounts[2][16]; // [improving][depth]
@@ -441,12 +443,11 @@ void thread_search(Pos *pos)
         alpha = max(prevScore - delta1,-VALUE_INFINITE);
         beta  = min(prevScore + delta2, VALUE_INFINITE);
 
-        int ct = option_value(OPT_CONTEMPT) * PawnValueEg / 100;
 
         // Adjust contempt based on current situation
         if (option_value(OPT_CONTEMPT_DYNAMIC))
         {
-		ct += (int)(round(48 * atan((float)(bestValue) / 128)));
+		int ct = base_ct + round(48 * atan((float)bestValue / 128));
 
         store_rlx(Contempt, pos_stm() == WHITE ?  make_score(ct, ct / 2)
                                                : -make_score(ct, ct / 2));

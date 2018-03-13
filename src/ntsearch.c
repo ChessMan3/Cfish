@@ -190,6 +190,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 6. Evaluate the position statically
   if (inCheck) {
     ss->staticEval = VALUE_NONE;
+    improving = 1;
     goto moves_loop;
   } else if (ttHit) {
     // Never assume anything on values stored in TT
@@ -210,7 +211,6 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   }
 
   improving =   ss->staticEval >= (ss-2)->staticEval
-          /* || ss->staticEval == VALUE_NONE Already implicit in the previous condition */
              ||(ss-2)->staticEval == VALUE_NONE;
 
   if (ss->skipEarlyPruning || !pos_non_pawn_material(pos_stm()))
@@ -362,9 +362,6 @@ moves_loop: // When in check search starts from here.
 
   mp_init(pos, ttMove, depth);
   value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
-  improving =   ss->staticEval >= (ss-2)->staticEval
-          /* || ss->staticEval == VALUE_NONE Already implicit in the previous condition */
-             ||(ss-2)->staticEval == VALUE_NONE;
 
   singularExtensionNode =   !rootNode
                          &&  depth >= 8 * ONE_PLY
