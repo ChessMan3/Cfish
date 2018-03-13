@@ -153,7 +153,7 @@ const Score KingProtector[] = { S(-3, -5), S(-4, -3), S(-3, 0), S(-1, 1) };
 // Assorted bonuses and penalties used by evaluation
 static const Score BishopPawns       = S(  8, 12);
 static const Score CloseEnemies      = S(  7,  0);
-static const Score Connectivity      = S(  2,  2);
+static const Score Connectivity      = S(  3,  1);
 static const Score Hanging           = S( 52, 30);
 static const Score HinderPassedPawn  = S(  8,  1);
 static const Score KnightOnQueen     = S( 21, 11);
