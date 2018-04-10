@@ -179,7 +179,7 @@ enum {
   KnightValueMg =  764, KnightValueEg =  848,
   BishopValueMg =  826, BishopValueEg =  891,
   RookValueMg   = 1282, RookValueEg   = 1373,
-  QueenValueMg  = 2526, QueenValueEg  = 2646,
+  QueenValueMg  = 2500, QueenValueEg  = 2670,
 
   MidgameLimit = 15258, EndgameLimit = 3915
 };
@@ -223,13 +223,12 @@ enum { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H };
 
 enum { RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8 };
 
-// For now we keep the following types, as we might want to change them
-// in the future.
-
 typedef uint32_t Move;
 typedef int32_t Phase;
 typedef int32_t Value;
+typedef uint32_t Color;
 typedef uint32_t Piece;
+typedef uint32_t PieceType;
 typedef int32_t Depth;
 typedef uint32_t Square;
 
@@ -294,7 +293,7 @@ extern uint32_t NonPawnPieceValue[16];
 
 INLINE int opposite_colors(Square s1, Square s2)
 {
-  int s = (int)(s1) ^ (int)(s2);
+  int s = s1 ^ s2;
   return ((s >> 3) ^ s) & 1;
 }
 
@@ -339,4 +338,3 @@ extern struct PSQT psqt;
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
 #endif
-

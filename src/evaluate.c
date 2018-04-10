@@ -19,7 +19,6 @@
 */
 
 #include <assert.h>
-#include <stdatomic.h>
 
 #include "bitboard.h"
 #include "evaluate.h"
@@ -160,6 +159,7 @@ static const Score HinderPassedPawn   = S(  8,  1);
 static const Score KnightOnQueen      = S( 21, 11);
 static const Score LongDiagonalBishop = S( 22,  0);
 static const Score MinorBehindPawn    = S( 16,  0);
+static const Score Overload           = S( 10,  5);
 static const Score PawnlessFlank      = S( 20, 80);
 static const Score RookOnPawn         = S(  8, 24);
 static const Score SliderOnQueen      = S( 42, 21);
@@ -186,8 +186,6 @@ enum {
 
 // Thresholds for lazy and space evaluation
 enum { LazyThreshold = 1500, SpaceThreshold = 12222 };
-
-_Atomic Score Contempt = SCORE_ZERO;
 
 // eval_init() initializes king and attack bitboards for a given color
 // adding pawn attacks. To be done at the beginning of the evaluation.
@@ -217,8 +215,16 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
   // Init our king safety tables only if we are going to use them
   if (pos_non_pawn_material(Them) >= RookValueMg + KnightValueMg) {
     ei->kingRing[Us] = b;
+
     if (relative_rank_s(Us, square_of(Us, KING)) == RANK_1)
       ei->kingRing[Us] |= shift_bb(Up, b);
+
+    if (file_of(square_of(Us, KING)) == FILE_H)
+      ei->kingRing[Us] |= shift_bb(WEST, ei->kingRing[Us]);
+
+    else if (file_of(square_of(Us, KING)) == FILE_A)
+      ei->kingRing[Us] |= shift_bb(EAST, ei->kingRing[Us]);
+
     ei->kingAttackersCount[Them] = popcount(b & ei->pe->pawnAttacks[Them]);
     ei->kingAttacksCount[Them] = ei->kingAttackersWeight[Them] = 0;
   }
@@ -262,7 +268,9 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
       ei->kingAttacksCount[Us] += popcount(b & ei->attackedBy[Them][KING]);
     }
 
-    int mob = popcount(b & ei->mobilityArea[Us]);
+    int mob =  (Pt == KNIGHT || Pt == BISHOP)
+             ? popcount(b & ei->mobilityArea[Us] & ~pieces_cp(Us, QUEEN))
+             : popcount(b & ei->mobilityArea[Us]);
 
     mobility[Us] += MobilityBonus[Pt - 2][mob];
 
@@ -482,17 +490,14 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
   Bitboard b, weak, defended, stronglyProtected, safeThreats;
   Score score = SCORE_ZERO;
 
-  // Non-pawn enemies attacked by a pawn
-  weak = pieces_c(Them) & ~pieces_p(PAWN) & ei->attackedBy[Us][PAWN];
+  // Non-pawn enemies
+  Bitboard nonPawnEnemies = pieces_c(Them) & ~pieces_p(PAWN);
 
-  if (weak) {
-    b = pieces_cp(Us, PAWN) & ( ~ei->attackedBy[Them][0]
-                               | ei->attackedBy[Us][0]);
+  // Our safe or protected pawns
+  b = pieces_cp(Us, PAWN) & (~ei->attackedBy[Them][0] | ei->attackedBy[Us][0]);
 
-    safeThreats = (shift_bb(Right, b) | shift_bb(Left, b)) & weak;
-
-    score += ThreatBySafePawn * popcount(safeThreats);
-  }
+  safeThreats = (shift_bb(Right, b) | shift_bb(Left, b)) & nonPawnEnemies;
+  score += ThreatBySafePawn * popcount(safeThreats);
 
   // Squares strongly protected by the opponent, either because they attack the
   // square with a pawn or because they attack the square twice and we don't.
@@ -526,11 +531,17 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
         score += ThreatByRank * relative_rank_s(Them, s);
     }
 
-    score += Hanging * popcount(weak & ~ei->attackedBy[Them][0]);
-
     b = weak & ei->attackedBy[Us][KING];
     if (b)
       score += ThreatByKing[!!more_than_one(b)];
+
+    // Bonus for overload (non-pawn enemies attacked and defended exactly once)
+    b =  nonPawnEnemies
+       & ei->attackedBy[Us][0]   & ~ei->attackedBy2[Us]
+       & ei->attackedBy[Them][0] & ~ei->attackedBy2[Them];
+    score += Overload * popcount(b);
+
+    score += Hanging * popcount(weak & ~ei->attackedBy[Them][0]);
   }
 
   // Bonus for opponent unopposed weak pawns
@@ -742,11 +753,10 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
   if (sf == SCALE_FACTOR_NORMAL || sf == SCALE_FACTOR_ONEPAWN) {
     if (opposite_bishops(pos)) {
       // Endgame with opposite-colored bishops and no other pieces
-      // (ignoring pawns) is almost a draw, in case of KBP vs KB, it is
-      // even more a draw.
+      // (ignoring pawns) is almost a draw.
       if (   pos_non_pawn_material(WHITE) == BishopValueMg
           && pos_non_pawn_material(BLACK) == BishopValueMg)
-        return more_than_one(pieces_p(PAWN)) ? 31 : 9;
+        return 31;
 
       // Endgame with opposite-colored bishops, but also other pieces. Still
       // a bit drawish, but not as drawish as with only the two bishops.
@@ -787,8 +797,7 @@ Value evaluate(const Pos *pos)
   // in the position struct (material + piece square tables) and the
   // material imbalance. Score is computed internally from the white point
   // of view.
-  Score score =  pos_psq_score() + material_imbalance(ei.me)
-               + atomic_load_explicit(&Contempt, memory_order_relaxed);
+  Score score = pos_psq_score() + material_imbalance(ei.me) + pos->contempt;
 
   // Probe the pawn hash table
   ei.pe = pawn_probe(pos);

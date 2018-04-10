@@ -89,13 +89,13 @@ INLINE __attribute__((pure)) Bitboard sq_bb(Square s)
 }
 
 #if __x86_64__
-INLINE Bitboard inv_sq(Bitboard b, uint32_t s)
+INLINE Bitboard inv_sq(Bitboard b, Square s)
 {
   __asm__("btcq %1, %0" : "+r" (b) : "r" ((uint64_t)s) : "cc");
   return b;
 }
 #else
-INLINE Bitboard inv_sq(Bitboard b, uint32_t s)
+INLINE Bitboard inv_sq(Bitboard b, Square s)
 {
   return b ^ sq_bb(s);
 }
@@ -136,6 +136,8 @@ INLINE Bitboard shift_bb(int Direction, Bitboard b)
 {
   return  Direction == NORTH  ?  b  << 8
         : Direction == SOUTH  ?  b  >> 8
+        : Direction == EAST   ? (b & ~FileHBB) << 1
+        : Direction == WEST   ? (b & ~FileABB) >> 1
         : Direction == NORTH_EAST ? (b & ~FileHBB) << 9
         : Direction == SOUTH_EAST ? (b & ~FileHBB) >> 7
         : Direction == NORTH_WEST ? (b & ~FileABB) << 7

@@ -66,6 +66,17 @@ INLINE int futility_margin(Depth d, int improving) {
   return (175 - 50 * improving) * d / ONE_PLY;
 }
 
+// Margin for pruning capturing moves: almost linear in depth
+static const Value CapturePruneMargin[] = {
+  0,
+  1 * PawnValueEg * 1055 / 1000,
+  2 * PawnValueEg * 1042 / 1000,
+  3 * PawnValueEg *  963 / 1000,
+  4 * PawnValueEg * 1038 / 1000,
+  5 * PawnValueEg *  950 / 1000,
+  6 * PawnValueEg *  930 / 1000
+};
+
 // Futility and reductions lookup tables, initialized at startup
 static int FutilityMoveCounts[2][16]; // [improving][depth]
 static int Reductions[2][2][64][64];  // [pv][improving][depth][moveNumber]
@@ -131,7 +142,7 @@ void search_init(void)
         Reductions[PV][imp][d][mc] = max(Reductions[NonPV][imp][d][mc] - 1, 0);
 
         // Increase reduction for non-PV nodes when eval is not improving
-        if (!imp && Reductions[NonPV][imp][d][mc] >= 2)
+        if (!imp && r > 1.0)
           Reductions[NonPV][imp][d][mc]++;
       }
 
@@ -239,8 +250,8 @@ void mainthread_search(void)
              : strcmp(s, "black") == 0 && us == WHITE ? -base_ct
              : base_ct;
 
-  store_rlx(Contempt, us == WHITE ?  make_score(base_ct, base_ct / 2)
-                                  : -make_score(base_ct, base_ct / 2));
+  pos->contempt = us == WHITE ?  make_score(base_ct, base_ct / 2)
+                              : -make_score(base_ct, base_ct / 2);
 
   if (pos->rootMoves->size > 0) {
     Move bookMove = 0;
@@ -437,14 +448,15 @@ void thread_search(Pos *pos)
 
       // Reset aspiration window starting size
       if (pos->rootDepth >= 5 * ONE_PLY) {
+        Value previousScore = rm->move[PVIdx].previousScore;
         delta = (Value)18;
-        alpha = max(rm->move[PVIdx].previousScore - delta,-VALUE_INFINITE);
-        beta  = min(rm->move[PVIdx].previousScore + delta, VALUE_INFINITE);
+        alpha = max(previousScore - delta, -VALUE_INFINITE);
+        beta  = min(previousScore + delta,  VALUE_INFINITE);
 
-        // Adjust contempt based on current situation
-        int ct = base_ct + round(48 * atan((float)bestValue / 128));
-        store_rlx(Contempt, pos_stm() == WHITE ?  make_score(ct, ct / 2)
-                                               : -make_score(ct, ct / 2));
+        // Adjust contempt based on root move's previousScore
+        int ct = base_ct + round(48 * atan((float)previousScore / 128));
+        pos->contempt = pos_stm() == WHITE ?  make_score(ct, ct / 2)
+                                           : -make_score(ct, ct / 2);
       }
 
       // Start with a small aspiration window and, in the case of a fail
