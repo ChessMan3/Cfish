@@ -185,7 +185,7 @@ enum {
 };
 
 // Thresholds for lazy and space evaluation
-enum { LazyThreshold = 1500, SpaceThreshold = 12222 };
+enum { SpaceThreshold = 12222 };
 
 // eval_init() initializes king and attack bitboards for a given color
 // adding pawn attacks. To be done at the beginning of the evaluation.
@@ -801,11 +801,6 @@ Value evaluate(const Pos *pos)
   // Probe the pawn hash table
   ei.pe = pawn_probe(pos);
   score += ei.pe->score;
-
-  // Early exit if score is high
-  v = (mg_value(score) + eg_value(score)) / 2;
-  if (abs(v) > LazyThreshold)
-    return pos_stm() == WHITE ? v : -v;
 
   // Initialize attack and king safety bitboards.
   evalinfo_init(pos, &ei, WHITE);
