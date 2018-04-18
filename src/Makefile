@@ -281,7 +281,7 @@ ifeq ($(optimize),yes)
 
 	CFLAGS += -O3
 
-	ifeq ($(comp),gcc)
+	ifeq ($(comp),$(filter $(comp),gcc mingw))
 		ifeq ($(extra),yes)
 			CFLAGS += -fira-loop-pressure -fconserve-stack -fmodulo-sched -fmodulo-sched-allow-regmoves -fsched-pressure -flimit-function-alignment
 		endif
@@ -351,7 +351,7 @@ endif
 ifeq ($(lto),yes)
 ifeq ($(optimize),yes)
 ifeq ($(debug),no)
-	ifeq ($(comp),$(filter $(comp),gcc clang))
+	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
 		CFLAGS += -flto
 		LDFLAGS += $(CFLAGS)
 	endif
