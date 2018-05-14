@@ -10,27 +10,9 @@
 #ifndef _WIN32
 #include <pthread.h>
 #define SEP_CHAR ':'
-#define FD int
-#define FD_ERR -1
 #else
 #include <windows.h>
 #define SEP_CHAR ';'
-#define FD HANDLE
-#define FD_ERR INVALID_HANDLE_VALUE
-#endif
-
-#ifndef _WIN32
-#define LOCK_T pthread_mutex_t
-#define LOCK_INIT(x) pthread_mutex_init(&(x), NULL)
-#define LOCK_DESTROY(x) pthread_mutex_destroy(&(x))
-#define LOCK(x) pthread_mutex_lock(&(x))
-#define UNLOCK(x) pthread_mutex_unlock(&(x))
-#else
-#define LOCK_T HANDLE
-#define LOCK_INIT(x) do { x = CreateMutex(NULL, FALSE, NULL); } while (0)
-#define LOCK_DESTROY(x) CloseHandle(x)
-#define LOCK(x) WaitForSingleObject(x, INFINITE)
-#define UNLOCK(x) ReleaseMutex(x)
 #endif
 
 #ifndef _MSC_VER
@@ -44,7 +26,7 @@
 #define WDLSUFFIX ".rtbw"
 #define DTZSUFFIX ".rtbz"
 #define DTMSUFFIX ".rtbm"
-#define TBPIECES 6
+#define TBPIECES 7
 
 const uint32_t WDL_MAGIC = 0x5d23e871;
 const uint32_t DTZ_MAGIC = 0xa50c66d7;
@@ -80,11 +62,11 @@ struct TBEntry {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
 }
 #ifndef _WIN32
 __attribute__((__may_alias__))
@@ -95,14 +77,14 @@ struct TBEntry_piece {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
-  uint8_t kk_enc;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
+  bool kk_enc;
   struct PairsData *precomp[2];
-  int factor[2][TBPIECES];
+  size_t factor[2][TBPIECES];
   uint8_t pieces[2][TBPIECES];
   uint8_t norm[2][TBPIECES];
 };
@@ -111,15 +93,15 @@ struct TBEntry_pawn {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp[2];
-    int factor[2][TBPIECES];
+    size_t factor[2][TBPIECES];
     uint8_t pieces[2][TBPIECES];
     uint8_t norm[2][TBPIECES];
   } file[4];
@@ -129,15 +111,15 @@ struct TBEntry_pawn2 {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp[2];
-    int factor[2][TBPIECES];
+    size_t factor[2][TBPIECES];
     uint8_t pieces[2][TBPIECES];
     uint8_t norm[2][TBPIECES];
   } rank[6];
@@ -147,14 +129,14 @@ struct DTZEntry_piece {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
-  uint8_t kk_enc;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
+  bool kk_enc;
   struct PairsData *precomp;
-  int factor[TBPIECES];
+  size_t factor[TBPIECES];
   uint8_t pieces[TBPIECES];
   uint8_t norm[TBPIECES];
   uint8_t flags; // accurate, mapped, side
@@ -166,15 +148,15 @@ struct DTZEntry_pawn {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp;
-    int factor[TBPIECES];
+    size_t factor[TBPIECES];
     uint8_t pieces[TBPIECES];
     uint8_t norm[TBPIECES];
   } file[4];
@@ -187,14 +169,14 @@ struct DTMEntry_piece {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
-  uint8_t kk_enc;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
+  bool kk_enc;
   struct PairsData *precomp[2];
-  int factor[2][TBPIECES];
+  size_t factor[2][TBPIECES];
   uint8_t pieces[2][TBPIECES];
   uint8_t norm[2][TBPIECES];
   uint16_t map_idx[2][2];
@@ -205,15 +187,15 @@ struct DTMEntry_pawn {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp[2];
-    int factor[2][TBPIECES];
+    size_t factor[2][TBPIECES];
     uint8_t pieces[2][TBPIECES];
     uint8_t norm[2][TBPIECES];
   } rank[6];
@@ -234,4 +216,3 @@ struct DTZTableEntry {
 };
 
 #endif
-

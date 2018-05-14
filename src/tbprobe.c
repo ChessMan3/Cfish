@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013-2017 Ronald de Man
+  Copyright (c) 2013-2018 Ronald de Man
   This file may be redistributed and/or modified without restrictions.
 
   tbprobe.cpp contains the Stockfish-specific routines of the
@@ -126,7 +126,7 @@ static int probe_wdl_table(Pos *pos, int *success)
         UNLOCK(TB_mutex);
         return 0;
       }
-      atomic_store_explicit(&ptr->ready, 1, memory_order_release);
+      atomic_store_explicit(&ptr->ready, true, memory_order_release);
     }
     UNLOCK(TB_mutex);
   }
@@ -229,7 +229,7 @@ static int probe_dtm_table(Pos *pos, int won, int *success)
         UNLOCK(TB_mutex);
         return 0;
       }
-      atomic_store_explicit(&ptr->ready, 1, memory_order_release);
+      atomic_store_explicit(&ptr->ready, true, memory_order_release);
     }
     UNLOCK(TB_mutex);
   }
@@ -371,10 +371,15 @@ static int probe_dtz_table(Pos *pos, int wdl, int *success)
       } while (bb);
     }
     idx = encode_piece((struct TBEntry_piece *)entry, entry->norm, p, entry->factor);
-    res = *decompress_pairs(entry->precomp, idx);
+    uint8_t *w = decompress_pairs(entry->precomp, idx);
+    res = ((w[1] & 0x0f) << 8) | w[0];
 
-    if (entry->flags & 2)
-      res = entry->map[entry->map_idx[wdl_to_map[wdl + 2]] + res];
+    if (entry->flags & 2) {
+      if (!(entry->flags & 16))
+        res = entry->map[entry->map_idx[wdl_to_map[wdl + 2]] + res];
+      else
+        res = ((uint16_t *)entry->map)[entry->map_idx[wdl_to_map[wdl + 2]] + res];
+    }
 
     if (!(entry->flags & pa_flags[wdl + 2]) || (wdl & 1))
       res *= 2;
@@ -400,10 +405,15 @@ static int probe_dtz_table(Pos *pos, int wdl, int *success)
       } while (bb);
     }
     idx = encode_pawn((struct TBEntry_pawn *)entry, entry->file[f].norm, p, entry->file[f].factor);
-    res = *decompress_pairs(entry->file[f].precomp, idx);
+    uint8_t *w = decompress_pairs(entry->file[f].precomp, idx);
+    res = ((w[1] & 0x0f) << 8) | w[0];
 
-    if (entry->flags[f] & 2)
-      res = entry->map[entry->map_idx[f][wdl_to_map[wdl + 2]] + res];
+    if (entry->flags[f] & 2) {
+      if (!(entry->flags[f] & 16))
+        res = entry->map[entry->map_idx[f][wdl_to_map[wdl + 2]] + res];
+      else
+        res = ((uint16_t *)entry->map)[entry->map_idx[f][wdl_to_map[wdl + 2]] + res];
+    }
 
     if (!(entry->flags[f] & pa_flags[wdl + 2]) || (wdl & 1))
       res *= 2;
@@ -1078,4 +1088,3 @@ void TB_expand_mate(Pos *pos, RootMove *move)
   for (int i = move->pv_size - 1; i >= 0; i--)
     undo_move(pos, move->pv[i]);
 }
-

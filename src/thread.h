@@ -22,7 +22,7 @@
 #define THREAD_H
 
 #include <stdatomic.h>
-#ifndef __WIN32__
+#ifndef _WIN32
 #include <pthread.h>
 #else
 #include <windows.h>
@@ -32,7 +32,7 @@
 
 #define MAX_THREADS 512
 
-#ifndef __WIN32__
+#ifndef _WIN32
 #define LOCK_T pthread_mutex_t
 #define LOCK_INIT(x) pthread_mutex_init(&(x), NULL)
 #define LOCK_DESTROY(x) pthread_mutex_destroy(&(x))
@@ -50,10 +50,7 @@ enum {
   THREAD_SLEEP, THREAD_SEARCH, THREAD_TT_CLEAR, THREAD_EXIT, THREAD_RESUME
 };
 
-void thread_init(void *arg);
-void thread_create(int idx);
 void thread_search(Pos *pos);
-void thread_idle_loop(Pos *pos);
 void thread_wake_up(Pos *pos, int action);
 void thread_wait_until_sleeping(Pos *pos);
 void thread_wait(Pos *pos, atomic_bool *b);
@@ -81,7 +78,7 @@ void mainthread_search(void);
 struct ThreadPool {
   Pos *pos[MAX_THREADS];
   int num_threads;
-#ifndef __WIN32__
+#ifndef _WIN32
   pthread_mutex_t mutex;
   pthread_cond_t sleepCondition;
   int initializing;

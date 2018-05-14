@@ -22,7 +22,7 @@
 #define POSITION_H
 
 #include <assert.h>
-#ifndef __WIN32__
+#ifndef _WIN32
 #include <pthread.h>
 #endif
 #include <stdatomic.h>
@@ -80,7 +80,6 @@ struct Stack {
   Move* pv;
   PieceToHistory *history;
   uint8_t ply;
-  uint8_t skipEarlyPruning;
   Move currentMove;
   Move excludedMove;
   Move killers[2];
@@ -171,7 +170,7 @@ struct Pos {
   int callsCnt;
   int action;
   int thread_idx;
-#ifndef __WIN32__
+#ifndef _WIN32
   pthread_t nativeThread;
   pthread_mutex_t mutex;
   pthread_cond_t sleepCondition;

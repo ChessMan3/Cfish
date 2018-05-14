@@ -23,7 +23,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>   // For std::memset
-#ifndef __WIN32__
+#ifndef _WIN32
 #include <sys/mman.h>
 #endif
 
@@ -41,7 +41,7 @@ TranspositionTable TT; // Our global transposition table
 
 void tt_free(void)
 {
-#ifdef __WIN32__
+#ifdef _WIN32
   if (TT.mem)
     VirtualFree(TT.mem, 0, MEM_RELEASE);
 #else
@@ -68,7 +68,7 @@ void tt_allocate(size_t mbSize)
 
   size_t size = count * sizeof(Cluster);
 
-#ifdef __WIN32__
+#ifdef _WIN32
 
   TT.mem = NULL;
   if (settings.large_pages) {
@@ -197,13 +197,13 @@ TTEntry *tt_probe(Key key, int *found)
   for (int i = 0; i < ClusterSize; i++)
     if (!tte[i].key16 || tte[i].key16 == key16) {
       if ((tte[i].genBound8 & 0xFC) != TT.generation8 && tte[i].key16)
-        tte[i].genBound8 = (uint8_t)(TT.generation8 | tte_bound(&tte[i])); // Refresh
-      *found = (int)tte[i].key16;
+        tte[i].genBound8 = TT.generation8 | tte_bound(&tte[i]); // Refresh
+      *found = tte[i].key16;
       return &tte[i];
     }
 
   // Find an entry to be replaced according to the replacement strategy
-  TTEntry* replace = tte;
+  TTEntry *replace = tte;
   for (int i = 1; i < ClusterSize; i++)
     // Due to our packed storage format for generation and its cyclic
     // nature we add 259 (256 is the modulus plus 3 to keep the lowest
@@ -232,4 +232,3 @@ int tt_hashfull(void)
   }
   return cnt;
 }
-

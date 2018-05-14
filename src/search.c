@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2018 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -90,7 +90,7 @@ INLINE Depth reduction(int i, Depth d, int mn, const int NT)
 Value stat_bonus(Depth depth)
 {
   int d = depth / ONE_PLY;
-  return d > 17 ? 0 : d * d + 2 * d - 2;
+  return d > 17 ? 0 : 32 * d * d + 64 * d - 64;
 }
 
 // Skill structure is used to implement strength limit
@@ -250,9 +250,6 @@ void mainthread_search(void)
              : strcmp(s, "black") == 0 && us == WHITE ? -base_ct
              : base_ct;
 
-  pos->contempt = us == WHITE ?  make_score(base_ct, base_ct / 2)
-                              : -make_score(base_ct, base_ct / 2);
-
   if (pos->rootMoves->size > 0) {
     Move bookMove = 0;
 
@@ -370,10 +367,8 @@ void thread_search(Pos *pos)
   for (int i = -4; i < 0; i++)
     ss[i].history = &(*pos->counterMoveHistory)[0][0]; // Use as sentinel
 
-  for (int i = 0; i <= MAX_PLY; i++) {
+  for (int i = 0; i <= MAX_PLY; i++)
     ss[i].ply = i;
-    ss[i].skipEarlyPruning = 0;
-  }
 
   bestValue = delta = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;
@@ -423,6 +418,9 @@ void thread_search(Pos *pos)
     for (int idx = 0; idx < rm->size; idx++)
       rm->move[idx].previousScore = rm->move[idx].score;
 
+    pos->contempt = pos_stm() == WHITE ?  make_score(base_ct, base_ct / 2)
+                                       : -make_score(base_ct, base_ct / 2);
+
     int PVFirst = 0, PVLast = 0;
 
     // MultiPV loop. We perform a full root search for each PV line
@@ -454,7 +452,7 @@ void thread_search(Pos *pos)
         beta  = min(previousScore + delta,  VALUE_INFINITE);
 
         // Adjust contempt based on root move's previousScore
-        int ct = base_ct + round(48 * atan((float)previousScore / 128));
+        int ct = base_ct + 88 * previousScore / (abs(previousScore) + 200);
         pos->contempt = pos_stm() == WHITE ?  make_score(ct, ct / 2)
                                            : -make_score(ct, ct / 2);
       }

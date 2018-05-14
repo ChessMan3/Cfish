@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
-#ifndef __WIN32__
+#ifndef _WIN32
 #include <sys/mman.h>
 #endif
 
@@ -119,7 +119,7 @@ static Option options_map[] = {
   { "SyzygyPath", OPT_TYPE_STRING, 0, 0, 0, "<empty>", on_tb_path, 0, NULL },
   { "SyzygyProbeDepth", OPT_TYPE_SPIN, 1, 1, 100, NULL, NULL, 0, NULL },
   { "Syzygy50MoveRule", OPT_TYPE_CHECK, 1, 0, 0, NULL, NULL, 0, NULL },
-  { "SyzygyProbeLimit", OPT_TYPE_SPIN, 6, 0, 6, NULL, NULL, 0, NULL },
+  { "SyzygyProbeLimit", OPT_TYPE_SPIN, 7, 0, 7, NULL, NULL, 0, NULL },
   { "SyzygyUseDTM", OPT_TYPE_CHECK, 1, 0, 0, NULL, NULL, 0, NULL },
   { "BookFile", OPT_TYPE_STRING, 0, 0, 0, "<empty>", on_book_file, 0, NULL },
   { "BestBookMove", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_best_book_move, 0, NULL },
@@ -144,7 +144,7 @@ void options_init()
 #else
   options_map[OPT_NUMA].type = OPT_TYPE_DISABLED;
 #endif
-#ifdef __WIN32__
+#ifdef _WIN32
   // Disable the LargePages option if the machine does not support it.
   if (!large_pages_supported())
     options_map[OPT_LARGE_PAGES].type = OPT_TYPE_DISABLED;
