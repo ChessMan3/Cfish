@@ -252,15 +252,16 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && (ss-1)->currentMove != MOVE_NULL
       && (ss-1)->statScore < 22500
       && eval >= beta
-      && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
+      && (ss->staticEval >= beta - (int)(320 * log(depth / ONE_PLY)) + 500)
       && !excludedMove
-      && pos_non_pawn_material(pos_stm())
+      &&  pos->selDepth + 6 > pos->rootDepth / ONE_PLY
+      &&  pos_non_pawn_material(pos_stm()) > BishopValueMg
       && (ss->ply >= pos->nmpPly || ss->ply % 2 != pos->nmpOdd))
   {
     assert(eval - beta >= 0);
 
     // Null move dynamic reduction based on depth and value
-    Depth R = ((823 + 67 * depth / ONE_PLY) / 256 + min((eval - beta) / PawnValueMg, 3)) * ONE_PLY;
+    Depth R = max(1, (int)(2.6 * log(depth / ONE_PLY)) + min((eval - beta) / (Value)170, 3)) * ONE_PLY;
 
     ss->currentMove = MOVE_NULL;
     ss->history = &(*pos->counterMoveHistory)[0][0];
