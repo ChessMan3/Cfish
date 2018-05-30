@@ -34,6 +34,12 @@
 
 static void thread_idle_loop(Pos *pos);
 
+#ifndef _WIN32
+#define THREAD_FUNC void *
+#else
+#define THREAD_FUNC DWORD WINAPI
+#endif
+
 // Global objects
 ThreadPool Threads;
 MainThread mainThread;
@@ -42,12 +48,12 @@ int num_cmh_tables = 0;
 
 // thread_init() is where a search thread starts and initialises itself.
 
-static void *thread_init(void *arg)
+static THREAD_FUNC thread_init(void *arg)
 {
   int idx = (intptr_t)arg;
 
   int node;
-  if (settings.numa_enabled)
+  if (settings.numaEnabled)
     node = bind_thread_to_numa_node(idx);
   else
     node = 0;
@@ -55,12 +61,12 @@ static void *thread_init(void *arg)
     int old = num_cmh_tables;
     num_cmh_tables = node + 16;
     cmh_tables = realloc(cmh_tables,
-                         num_cmh_tables * sizeof(CounterMoveHistoryStat *));
+        num_cmh_tables * sizeof(CounterMoveHistoryStat *));
     while (old < num_cmh_tables)
       cmh_tables[old++] = NULL;
   }
   if (!cmh_tables[node]) {
-    if (settings.numa_enabled)
+    if (settings.numaEnabled)
       cmh_tables[node] = numa_alloc(sizeof(CounterMoveHistoryStat));
     else
       cmh_tables[node] = calloc(sizeof(CounterMoveHistoryStat), 1);
@@ -71,7 +77,7 @@ static void *thread_init(void *arg)
 
   Pos *pos;
 
-  if (settings.numa_enabled) {
+  if (settings.numaEnabled) {
     pos = numa_alloc(sizeof(Pos));
     pos->pawnTable = numa_alloc(PAWN_ENTRIES * sizeof(PawnEntry));
     pos->materialTable = numa_alloc(8192 * sizeof(MaterialEntry));
@@ -92,7 +98,7 @@ static void *thread_init(void *arg)
     pos->stack = calloc((MAX_PLY + 110) * sizeof(Stack), 1);
     pos->moveList = calloc(10000 * sizeof(ExtMove), 1);
   }
-  pos->thread_idx = idx;
+  pos->threadIdx = idx;
   pos->counterMoveHistory = cmh_tables[node];
 
   atomic_store(&pos->resetCalls, 0);
@@ -143,7 +149,8 @@ static void thread_create(int idx)
 
 #else
 
-  HANDLE *thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)thread_init, (void *)(intptr_t)idx, 0 , NULL);
+  HANDLE thread = CreateThread(NULL, 0, thread_init, (void *)(intptr_t)idx,
+      0 , NULL);
   WaitForSingleObject(Threads.event, INFINITE);
 
 #endif
@@ -172,7 +179,7 @@ static void thread_destroy(Pos *pos)
   CloseHandle(pos->stopEvent);
 #endif
 
-  if (settings.numa_enabled) {
+  if (settings.numaEnabled) {
     numa_free(pos->pawnTable, PAWN_ENTRIES * sizeof(PawnEntry));
     numa_free(pos->materialTable, 8192 * sizeof(MaterialEntry));
     numa_free(pos->counterMoves, sizeof(CounterMoveStat));
@@ -216,7 +223,7 @@ void thread_wait_until_sleeping(Pos *pos)
 
 #endif
 
-  if (pos->thread_idx == 0)
+  if (pos->threadIdx == 0)
     Signals.searching = 0;
 }
 
@@ -295,11 +302,11 @@ static void thread_idle_loop(Pos *pos)
 
     } else if (pos->action == THREAD_TT_CLEAR) {
 
-      tt_clear_worker(pos->thread_idx);
+      tt_clear_worker(pos->threadIdx);
 
     } else {
 
-      if (pos->thread_idx == 0)
+      if (pos->threadIdx == 0)
         mainthread_search();
       else
         thread_search(pos);
@@ -331,7 +338,6 @@ void threads_init(void)
 
 #else
 
-  io_mutex = CreateMutex(NULL, FALSE, NULL);
   Threads.event = CreateEvent(NULL, FALSE, FALSE, NULL);
 
 #endif
@@ -342,7 +348,7 @@ void threads_init(void)
 
 #endif
 
-  Threads.num_threads = 1;
+  Threads.numThreads = 1;
   thread_create(0);
 }
 
@@ -362,7 +368,6 @@ void threads_exit(void)
 
 #else
 
-  CloseHandle(io_mutex);
   CloseHandle(Threads.event);
 
 #endif
@@ -380,23 +385,23 @@ void threads_exit(void)
 
 void threads_set_number(int num)
 {
-  while (Threads.num_threads < num)
-    thread_create(Threads.num_threads++);
+  while (Threads.numThreads < num)
+    thread_create(Threads.numThreads++);
 
-  while (Threads.num_threads > num)
-    thread_destroy(Threads.pos[--Threads.num_threads]);
+  while (Threads.numThreads > num)
+    thread_destroy(Threads.pos[--Threads.numThreads]);
 
-  if (num == 0 && num_cmh_tables > 0) {
+  if (num == 0 && numCmhTables > 0) {
     for (int i = 0; i < num_cmh_tables; i++)
       if (cmh_tables[i]) {
-        if (settings.numa_enabled)
-          numa_free(cmh_tables[i], sizeof(CounterMoveHistoryStat));
+        if (settings.numaEnabled)
+          numa_free(cmhTables[i], sizeof(CounterMoveHistoryStat));
         else
-          free(cmh_tables[i]);
+          free(cmhTables[i]);
       }
-    free(cmh_tables);
-    cmh_tables = NULL;
-    num_cmh_tables = 0;
+    free(cmhTables);
+    cmhTables = NULL;
+    numCmhTables = 0;
   }
 
   if (num == 0)
@@ -409,7 +414,7 @@ void threads_set_number(int num)
 uint64_t threads_nodes_searched(void)
 {
   uint64_t nodes = 0;
-  for (int idx = 0; idx < Threads.num_threads; idx++)
+  for (int idx = 0; idx < Threads.numThreads; idx++)
     nodes += Threads.pos[idx]->nodes;
   return nodes;
 }
@@ -420,7 +425,7 @@ uint64_t threads_nodes_searched(void)
 uint64_t threads_tb_hits(void)
 {
   uint64_t hits = 0;
-  for (int idx = 0; idx < Threads.num_threads; idx++)
-    hits += Threads.pos[idx]->tb_hits;
+  for (int idx = 0; idx < Threads.numThreads; idx++)
+    hits += Threads.pos[idx]->tbHits;
   return hits;
 }

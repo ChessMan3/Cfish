@@ -32,6 +32,9 @@
 #include "bitboard.h"
 #include "types.h"
 
+extern const char PieceToChar[];
+extern Key matKey[16];
+
 struct Zob {
   Key psq[16][64];
   Key enpassant[8];
@@ -92,7 +95,7 @@ struct Stack {
   Depth depth;
   Move ttMove;
   Value threshold;
-  Move mp_killers[2];
+  Move mpKillers[2];
   uint8_t stage;
   uint8_t recaptureSquare;
   ExtMove *cur, *endMoves, *endBadCaptures;
@@ -150,9 +153,9 @@ struct Pos {
   RootMoves *rootMoves;
   Stack *stack;
   uint64_t nodes;
-  uint64_t tb_hits;
+  uint64_t tbHits;
   int PVIdx, PVLast;
-  int selDepth, nmp_ply, nmp_odd;
+  int selDepth, nmpPly, nmpOdd;
   Depth rootDepth;
   Depth completedDepth;
   Score contempt;
@@ -169,7 +172,7 @@ struct Pos {
   atomic_bool resetCalls;
   int callsCnt;
   int action;
-  int thread_idx;
+  int threadIdx;
 #ifndef _WIN32
   pthread_t nativeThread;
   pthread_mutex_t mutex;
@@ -205,6 +208,7 @@ PURE Value see_test(const Pos *pos, Move m, int value);
 
 PURE Key key_after(const Pos *pos, Move m);
 PURE int is_draw(const Pos *pos);
+PURE bool has_game_cycle(const Pos *pos);
 
 // Position representation
 #define pieces() (pos->byTypeBB[0])
