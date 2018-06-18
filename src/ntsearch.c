@@ -14,7 +14,33 @@ Value search_PV(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth)
 Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 #endif
 {
-  int rootNode = PvNode && ss->ply == 0;
+  const int rootNode = PvNode && ss->ply == 0;
+
+  // Check if we have an upcoming move which draws by repetition, or if the
+  // opponent had an alternative move earlier to this position.
+  if (   pos->st->pliesFromNull >= 3
+      && alpha < VALUE_DRAW
+      && !rootNode
+      && has_game_cycle(pos))
+  {
+#if PvNode
+      alpha = VALUE_DRAW;
+      if (alpha >= beta)
+        return alpha;
+#else
+      return VALUE_DRAW;
+#endif
+  }
+
+  // Dive into quiescense search when the depth reaches zero
+  if (depth < ONE_PLY)
+    return  PvNode
+          ?   pos_checkers()
+            ? qsearch_PV_true(pos, ss, alpha, beta, DEPTH_ZERO)
+            : qsearch_PV_false(pos, ss, alpha, beta, DEPTH_ZERO)
+          :   pos_checkers()
+            ? qsearch_NonPV_true(pos, ss, alpha, DEPTH_ZERO)
+            : qsearch_NonPV_false(pos, ss, alpha, DEPTH_ZERO);
 
   assert(-VALUE_INFINITE <= alpha && alpha < beta && beta <= VALUE_INFINITE);
   assert(PvNode || (alpha == beta - 1));
@@ -78,16 +104,6 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     if (alpha >= mate_in(ss->ply+1))
       return alpha;
 #endif
-
-    if (pos->st->pliesFromNull >= 3 && alpha < VALUE_DRAW && has_game_cycle(pos)) {
-#if PvNode
-      alpha = VALUE_DRAW;
-      if (alpha >= beta)
-        return alpha;
-#else
-      return VALUE_DRAW;
-#endif
-    }
   }
 
   assert(0 <= ss->ply && ss->ply < MAX_PLY);
@@ -109,7 +125,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 #endif
   tte = tt_probe(posKey, &ttHit);
   ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
-  ttMove =  rootNode ? pos->rootMoves->move[pos->PVIdx].pv[0]
+  ttMove =  rootNode ? pos->rootMoves->move[pos->pvIdx].pv[0]
           : ttHit    ? tte_move(tte) : 0;
 
   // At non-PV nodes we check for an early TT cutoff.
@@ -268,9 +284,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
     do_null_move(pos);
     ss->endMoves = (ss-1)->endMoves;
-    Value nullValue =   depth-R < ONE_PLY
-                     ? -qsearch_NonPV_false(pos, ss+1, -beta, DEPTH_ZERO)
-                     : - search_NonPV(pos, ss+1, -beta, depth-R, !cutNode);
+    Value nullValue = -search_NonPV(pos, ss+1, -beta, depth-R, !cutNode);
     undo_null_move(pos);
 
     if (nullValue >= beta) {
@@ -288,9 +302,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       pos->nmpPly = ss->ply + 3 * (depth-R) / (4 * ONE_PLY);
       pos->nmpOdd = ss->ply & 1;
 
-      Value v =  depth-R < ONE_PLY
-               ? qsearch_NonPV_false(pos, ss, beta-1, DEPTH_ZERO)
-               : search_NonPV(pos, ss, beta-1, depth-R, 0);
+      Value v = search_NonPV(pos, ss, beta-1, depth-R, 0);
 
       pos->nmpOdd = pos->nmpPly = 0;
 
@@ -341,11 +353,10 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   if (    depth >= 8 * ONE_PLY
       && !ttMove)
   {
-    Depth d = (3 * depth / (4 * ONE_PLY) - 2) * ONE_PLY;
     if (PvNode)
-      search_PV(pos, ss, alpha, beta, d);
+      search_PV(pos, ss, alpha, beta, depth - 7 * ONE_PLY);
     else
-      search_NonPV(pos, ss, alpha, d, cutNode);
+      search_NonPV(pos, ss, alpha, depth - 7 * ONE_PLY, cutNode);
 
     tte = tt_probe(posKey, &ttHit);
     // ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
@@ -380,10 +391,10 @@ moves_loop: // When in check search starts from here.
     // searched.
     if (rootNode) {
       int idx;
-      for (idx = pos->PVIdx; idx < pos->PVLast; idx++)
+      for (idx = pos->pvIdx; idx < pos->pvLast; idx++)
         if (pos->rootMoves->move[idx].pv[0] == move)
           break;
-      if (idx == pos->PVLast)
+      if (idx == pos->pvLast)
         continue;
     }
 
@@ -394,7 +405,7 @@ moves_loop: // When in check search starts from here.
       printf("info depth %d currmove %s currmovenumber %d\n",
              depth / ONE_PLY,
              uci_move(buf, move, is_chess960()),
-             moveCount + pos->PVIdx);
+             moveCount + pos->pvIdx);
       fflush(stdout);
     }
 
@@ -486,16 +497,14 @@ moves_loop: // When in check search starts from here.
 
         // Prune moves with negative SEE at low depths and below a decreasing
         // threshold at higher depths.
-        if (   lmrDepth < 8
-            && !extension
-            && !see_test(pos, move, -35 * lmrDepth * lmrDepth))
+        if (   !extension
+            && !see_test(pos, move, -29 * lmrDepth * lmrDepth))
           continue;
       }
 //      else if (   depth < 7 * ONE_PLY && ss->stage != ST_GOOD_CAPTURES
 //               && !see_test(pos, move, -35 * depth / ONE_PLY * depth / ONE_PLY))
-      else if (    depth < 7 * ONE_PLY
-               && !extension
-               && !see_test(pos, move, -CapturePruneMargin[depth / ONE_PLY]))
+      else if (   !extension
+               && !see_test(pos, move, -PawnValueEg * (depth / ONE_PLY)))
         continue;
     }
 
@@ -531,8 +540,7 @@ moves_loop: // When in check search starts from here.
 
       if (captureOrPromotion) {
         // Increase reduction depending on opponent's stat score
-        if (  (ss-1)->statScore >= 0
-            && (*pos->captureHistory)[movedPiece][to_sq(move)][type_of_p(captured_piece())] < 0)
+        if ((ss-1)->statScore >= 0)
           r += ONE_PLY;
 
         r -= r ? ONE_PLY : DEPTH_ZERO;
@@ -589,11 +597,7 @@ moves_loop: // When in check search starts from here.
 
     // Step 17. Full depth search when LMR is skipped or fails high.
     if (doFullDepthSearch)
-        value =  newDepth < ONE_PLY
-               ?   givesCheck
-                 ? -qsearch_NonPV_true(pos, ss+1, -(alpha+1), DEPTH_ZERO)
-                 : -qsearch_NonPV_false(pos, ss+1, -(alpha+1), DEPTH_ZERO)
-               : -search_NonPV(pos, ss+1, -(alpha+1), newDepth, !cutNode);
+      value = -search_NonPV(pos, ss+1, -(alpha+1), newDepth, !cutNode);
 
     // For PV nodes only, do a full PV search on the first move or after a fail
     // high (in the latter case search only if value < beta), otherwise let the
@@ -604,11 +608,7 @@ moves_loop: // When in check search starts from here.
       (ss+1)->pv = pv;
       (ss+1)->pv[0] = 0;
 
-      value =  newDepth < ONE_PLY
-             ?   givesCheck
-               ? -qsearch_PV_true(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
-               : -qsearch_PV_false(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
-             : -search_PV(pos, ss+1, -beta, -alpha, newDepth);
+      value = -search_PV(pos, ss+1, -beta, -alpha, newDepth);
     }
 
     // Step 18. Undo move
@@ -700,15 +700,15 @@ moves_loop: // When in check search starts from here.
     // Quiet best move: update move sorting heuristics.
     if (!is_capture_or_promotion(pos, bestMove))
       update_stats(pos, ss, bestMove, quietsSearched, quietCount,
-                   stat_bonus(depth));
+          stat_bonus(depth + (bestValue > beta + PawnValueMg) * ONE_PLY));
     else
       update_capture_stats(pos, bestMove, capturesSearched, captureCount,
-                           stat_bonus(depth));
+          stat_bonus(depth + ONE_PLY));
 
     // Extra penalty for a quiet TT move in previous ply when it gets refuted.
     if ((ss-1)->moveCount == 1 && !captured_piece())
       update_cm_stats(ss-1, piece_on(prevSq), prevSq,
-                      -stat_bonus(depth + ONE_PLY));
+          -stat_bonus(depth + ONE_PLY));
   }
   // Bonus for prior countermove that caused the fail low.
   else if (   (depth >= 3 * ONE_PLY || PvNode)
@@ -721,9 +721,9 @@ moves_loop: // When in check search starts from here.
 
   if (!excludedMove)
     tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
-             bestValue >= beta ? BOUND_LOWER :
-             PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
-             depth, bestMove, ss->staticEval, tt_generation());
+        bestValue >= beta ? BOUND_LOWER :
+        PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
+        depth, bestMove, ss->staticEval, tt_generation());
 
   assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 
@@ -738,4 +738,3 @@ moves_loop: // When in check search starts from here.
 #ifdef beta
 #undef beta
 #endif
-

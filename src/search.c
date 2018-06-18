@@ -66,17 +66,6 @@ INLINE int futility_margin(Depth d, int improving) {
   return (175 - 50 * improving) * d / ONE_PLY;
 }
 
-// Margin for pruning capturing moves: almost linear in depth
-static const Value CapturePruneMargin[] = {
-  0,
-  1 * PawnValueEg * 1055 / 1000,
-  2 * PawnValueEg * 1042 / 1000,
-  3 * PawnValueEg *  963 / 1000,
-  4 * PawnValueEg * 1038 / 1000,
-  5 * PawnValueEg *  950 / 1000,
-  6 * PawnValueEg *  930 / 1000
-};
-
 // Futility and reductions lookup tables, initialized at startup
 static int FutilityMoveCounts[2][16]; // [improving][depth]
 static int Reductions[2][2][128][64];  // [pv][improving][depth][moveNumber]
@@ -335,6 +324,7 @@ void mainthread_search(void)
     uci_print_pv(bestThread, bestThread->completedDepth,
                  -VALUE_INFINITE, VALUE_INFINITE);
 
+  flockfile(stdout);
   printf("bestmove %s", uci_move(buf, bestThread->rootMoves->move[0].pv[0], is_chess960()));
 
   if (bestThread->rootMoves->move[0].pvSize > 1 || extract_ponder_from_tt(&bestThread->rootMoves->move[0], pos))
@@ -342,6 +332,7 @@ void mainthread_search(void)
 
   printf("\n");
   fflush(stdout);
+  funlockfile(stdout);
 }
 
 
@@ -356,6 +347,7 @@ void thread_search(Pos *pos)
   Move lastBestMove = 0;
   Depth lastBestMoveDepth = DEPTH_ZERO;
   double timeReduction = 1.0;
+  bool failedLow;
 
   Stack *ss = pos->st; // At least the fifth element of the allocated array.
   for (int i = -5; i < 3; i++)
@@ -373,7 +365,7 @@ void thread_search(Pos *pos)
   pos->completedDepth = DEPTH_ZERO;
 
   if (pos->threadIdx == 0) {
-    mainThread.failedLow = 0;
+    failedLow = false;
     mainThread.bestMoveChanges = 0;
   }
 
@@ -408,7 +400,7 @@ void thread_search(Pos *pos)
     // Age out PV variability metric
     if (pos->threadIdx == 0) {
       mainThread.bestMoveChanges *= 0.517;
-      mainThread.failedLow = 0;
+      failedLow = false;
     }
 
     // Save the last iteration's scores before first PV line is searched and
@@ -419,24 +411,24 @@ void thread_search(Pos *pos)
     pos->contempt = pos_stm() == WHITE ?  make_score(base_ct, base_ct / 2)
                                        : -make_score(base_ct, base_ct / 2);
 
-    int PVFirst = 0, PVLast = 0;
+    int pvFirst = 0, pvLast = 0;
 
     // MultiPV loop. We perform a full root search for each PV line
-    for (int PVIdx = 0; PVIdx < multiPV && !Signals.stop; PVIdx++) {
-      pos->PVIdx = PVIdx;
-      if (PVIdx == PVLast) {
-        PVFirst = PVLast;
-        for (PVLast++; PVLast < rm->size; PVLast++)
-          if (rm->move[PVLast].TBRank != rm->move[PVFirst].TBRank)
+    for (int pvIdx = 0; pvIdx < multiPV && !Signals.stop; pvIdx++) {
+      pos->pvIdx = pvIdx;
+      if (pvIdx == pvLast) {
+        pvFirst = pvLast;
+        for (pvLast++; pvLast < rm->size; pvLast++)
+          if (rm->move[pvLast].tbRank != rm->move[pvFirst].tbRank)
             break;
-        pos->PVLast = PVLast;
+        pos->pvLast = pvLast;
       }
 
       pos->selDepth = 0;
 
       // Skip the search if we have a mate value from DTM tables.
-      if (abs(rm->move[PVIdx].TBRank) > 1000) {
-        bestValue = rm->move[PVIdx].score = rm->move[PVIdx].TBScore;
+      if (abs(rm->move[pvIdx].tbRank) > 1000) {
+        bestValue = rm->move[pvIdx].score = rm->move[pvIdx].tbScore;
         alpha = -VALUE_INFINITE;
         beta = VALUE_INFINITE;
         goto skip_search;
@@ -468,7 +460,7 @@ void thread_search(Pos *pos)
         // and we want to keep the same order for all the moves except the
         // new PV that goes to the front. Note that in case of MultiPV
         // search the already searched PV lines are preserved.
-        stable_sort(&rm->move[PVIdx], PVLast - PVIdx);
+        stable_sort(&rm->move[pvIdx], pvLast - pvIdx);
 
         // If search has been stopped, we break immediately. Sorting and
         // writing PV back to TT is safe because RootMoves is still
@@ -491,7 +483,7 @@ void thread_search(Pos *pos)
           alpha = max(bestValue - delta1, -VALUE_INFINITE);
 
           if (pos->threadIdx == 0) {
-            mainThread.failedLow = 1;
+            failedLow = true;
             Signals.stopOnPonderhit = 0;
           }
         } else if (bestValue >= beta) {
@@ -506,11 +498,11 @@ void thread_search(Pos *pos)
       }
 
       // Sort the PV lines searched so far and update the GUI
-      stable_sort(&rm->move[PVFirst], PVIdx - PVFirst + 1);
+      stable_sort(&rm->move[pvFirst], pvIdx - pvFirst + 1);
 
 skip_search:
       if (    pos->threadIdx == 0
-          && (Signals.stop || PVIdx + 1 == multiPV || time_elapsed() > 3000))
+          && (Signals.stop || pvIdx + 1 == multiPV || time_elapsed() > 3000))
         uci_print_pv(pos, pos->rootDepth, alpha, beta);
     }
 
@@ -542,7 +534,7 @@ skip_search:
       if (!Signals.stop && !Signals.stopOnPonderhit) {
         // Stop the search if only one legal move is available, or if all
         // of the available time has been used.
-        const int F[] = { mainThread.failedLow,
+        const int F[] = { failedLow,
                           bestValue - mainThread.previousScore };
 
         int improvingFactor = max(246, min(832, 306 + 119 * F[0] - 6 * F[1]));
@@ -623,7 +615,7 @@ skip_search:
 #undef true
 #undef false
 
-#define rm_lt(m1,m2) ((m1).TBRank != (m2).TBRank ? (m1).TBRank < (m2).TBRank : (m1).score != (m2).score ? (m1).score < (m2).score : (m1).previousScore < (m2).previousScore)
+#define rm_lt(m1,m2) ((m1).tbRank != (m2).tbRank ? (m1).tbRank < (m2).tbRank : (m1).score != (m2).score ? (m1).score < (m2).score : (m1).previousScore < (m2).previousScore)
 
 // stable_sort() sorts RootMoves from highest-scoring move to lowest-scoring
 // move while preserving order of equal elements.
@@ -796,14 +788,15 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
 {
   TimePoint elapsed = time_elapsed() + 1;
   RootMoves *rm = pos->rootMoves;
-  int PVIdx = pos->PVIdx;
+  int pvIdx = pos->pvIdx;
   int multiPV = min(option_value(OPT_MULTI_PV), rm->size);
   uint64_t nodes_searched = threads_nodes_searched();
   uint64_t tbhits = threads_tb_hits();
   char buf[16];
 
+  flockfile(stdout);
   for (int i = 0; i < multiPV; i++) {
-    int updated = (i <= PVIdx && rm->move[i].score != -VALUE_INFINITE);
+    int updated = (i <= pvIdx && rm->move[i].score != -VALUE_INFINITE);
 
     if (depth == ONE_PLY && !updated)
         continue;
@@ -813,7 +806,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
 
     int tb = TB_RootInTB && abs(v) < VALUE_MATE - MAX_MATE_PLY;
     if (tb)
-      v = rm->move[i].TBScore;
+      v = rm->move[i].tbScore;
 
     // An incomplete mate PV may be caused by cutoffs in qsearch() and
     // by TB cutoffs. We try to complete the mate PV if we may be in the
@@ -827,7 +820,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
            d / ONE_PLY, rm->move[i].selDepth + 1, (int)i + 1,
            uci_value(buf, v));
 
-    if (!tb && i == PVIdx)
+    if (!tb && i == pvIdx)
       printf("%s", v >= beta ? " lowerbound" : v <= alpha ? " upperbound" : "");
 
     printf(" nodes %"PRIu64" nps %"PRIu64, nodes_searched,
@@ -843,6 +836,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
     printf("\n");
   }
   fflush(stdout);
+  funlockfile(stdout);
 }
 
 
@@ -919,12 +913,12 @@ static void TB_rank_root_moves(Pos *pos, RootMoves *rm)
 
     // Only probe during search if DTM and DTZ are not available
     // and we are winning.
-    if (dtm_available || dtz_available || rm->move[0].TBRank <= 0)
+    if (dtm_available || dtz_available || rm->move[0].tbRank <= 0)
       TB_Cardinality = 0;
   }
   else // Ranking was not successful.
     for (int i = 0; i < rm->size; i++)
-      rm->move[i].TBRank = 0;
+      rm->move[i].tbRank = 0;
 }
 
 
@@ -976,8 +970,8 @@ void start_thinking(Pos *root)
       rm->move[i].score = -VALUE_INFINITE;
       rm->move[i].previousScore = -VALUE_INFINITE;
       rm->move[i].selDepth = 0;
-      rm->move[i].TBRank = moves->move[i].TBRank;
-      rm->move[i].TBScore = moves->move[i].TBScore;
+      rm->move[i].tbRank = moves->move[i].tbRank;
+      rm->move[i].tbScore = moves->move[i].tbScore;
     }
     memcpy(pos, root, offsetof(Pos, moveList));
     // Copy enough of the root State buffer.
