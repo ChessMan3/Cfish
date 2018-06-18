@@ -82,7 +82,7 @@ static const Bitboard KingFlank[8] = {
 };
 
 // Thresholds for lazy and space evaluation
-enum { LazyThreshold = 1500, SpaceThreshold = 12222 };
+enum { SpaceThreshold = 12222 };
 
 // KingAttackWeights[PieceType] contains king attack weights by piece type
 static const int KingAttackWeights[8] = { 0, 0, 77, 55, 44, 10 };
@@ -800,11 +800,6 @@ Value evaluate(const Pos *pos)
   // Probe the pawn hash table
   ei.pe = pawn_probe(pos);
   score += ei.pe->score;
-
-  // Early exit if score is high
-  v = (mg_value(score) + eg_value(score)) / 2;
-  if (abs(v) > LazyThreshold)
-    return pos_stm() == WHITE ? v : -v;
 
   // Initialize attack and king safety bitboards.
   evalinfo_init(pos, &ei, WHITE);
