@@ -753,19 +753,14 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
 
   // If scale is not already specific, scale down via general heuristics
   if (sf == SCALE_FACTOR_NORMAL) {
-    if (opposite_bishops(pos)) {
+    if (   opposite_bishops(pos)
+        && pos_non_pawn_material(WHITE) == BishopValueMg
+        && pos_non_pawn_material(BLACK) == BishopValueMg)
       // Endgame with opposite-colored bishops and no other pieces
       // (ignoring pawns) is almost a draw.
-      if (   pos_non_pawn_material(WHITE) == BishopValueMg
-          && pos_non_pawn_material(BLACK) == BishopValueMg)
         return 31;
-
-      // Endgame with opposite-colored bishops, but also other pieces. Still
-      // a bit drawish, but not as drawish as with only the two bishops.
-      return 46;
-    }
     else
-      return min(40 + 7 * piece_count(strongSide, PAWN), sf);
+      return min(40 + (opposite_bishops(pos) ? 2 : 7) * piece_count(strongSide, PAWN), sf);
   }
 
   return sf;
