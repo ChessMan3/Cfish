@@ -28,7 +28,7 @@ ifeq ($(KERNEL),Linux)
 endif
 
 ### Executable name
-EXE = cfish
+EXE = cichess
 
 ### Installation dir definitions
 PREFIX = /usr/local

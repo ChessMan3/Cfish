@@ -68,11 +68,11 @@ INLINE int futility_margin(Depth d, int improving) {
 
 // Futility and reductions lookup tables, initialized at startup
 static int FutilityMoveCounts[2][16]; // [improving][depth]
-static int Reductions[2][2][64][64];  // [pv][improving][depth][moveNumber]
+static int Reductions[2][2][128][64];  // [pv][improving][depth][moveNumber]
 
 INLINE Depth reduction(int i, Depth d, int mn, const int NT)
 {
-  return Reductions[NT][i][min(d / ONE_PLY, 63)][min(mn, 63)] * ONE_PLY;
+  return Reductions[NT][i][min(d / ONE_PLY, 127)][min(mn, 63)] * ONE_PLY;
 }
 
 // History and stats update bonus, based on depth
@@ -123,9 +123,9 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos);
 void search_init(void)
 {
   for (int imp = 0; imp <= 1; imp++)
-    for (int d = 1; d < 64; ++d)
+    for (int d = 1; d < 128; ++d)
       for (int mc = 1; mc < 64; ++mc) {
-        double r = log(d) * log(mc) / 1.95;
+        double r = 0.2 * d * (1.0 - exp(-9.0 / d)) * log(mc);
 
         Reductions[NonPV][imp][d][mc] = ((int)lround(r));
         Reductions[PV][imp][d][mc] = max(Reductions[NonPV][imp][d][mc] - 1, 0);
@@ -235,6 +235,7 @@ void mainthread_search(void)
   const char *s = option_string_value(OPT_ANALYSIS_CONTEMPT);
   if (Limits.infinite || option_value(OPT_ANALYSE_MODE))
     base_ct =  strcmp(s, "off") == 0 ? 0
+             : strcmp(s, "both") == 0 ? base_ct
              : strcmp(s, "white") == 0 && us == BLACK ? -base_ct
              : strcmp(s, "black") == 0 && us == WHITE ? -base_ct
              : base_ct;
@@ -343,7 +344,7 @@ void mainthread_search(void)
 
 void thread_search(Pos *pos)
 {
-  Value bestValue, alpha, beta, delta;
+  Value bestValue, alpha, beta, delta1, delta2;
   Move lastBestMove = 0;
   Depth lastBestMoveDepth = DEPTH_ZERO;
   double timeReduction = 1.0;
@@ -360,7 +361,7 @@ void thread_search(Pos *pos)
   for (int i = 0; i <= MAX_PLY; i++)
     ss[i].ply = i;
 
-  bestValue = delta = alpha = -VALUE_INFINITE;
+  bestValue = delta1 = delta2 = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;
   pos->completedDepth = DEPTH_ZERO;
 
@@ -436,13 +437,14 @@ void thread_search(Pos *pos)
 
       // Reset aspiration window starting size
       if (pos->rootDepth >= 5 * ONE_PLY) {
-        Value previousScore = rm->move[pvIdx].previousScore;
-        delta = (Value)18;
-        alpha = max(previousScore - delta, -VALUE_INFINITE);
-        beta  = min(previousScore + delta,  VALUE_INFINITE);
+        Value prevScore = rm->move[pvIdx].previousScore;
+        delta1 = (prevScore < 0) ? (Value)((int)(8.0 + 0.1 * abs(prevScore))) : (Value)18;
+        delta2 = (prevScore > 0) ? (Value)((int)(8.0 + 0.1 * abs(prevScore))) : (Value)18;
+        alpha = max(prevScore - delta1,-VALUE_INFINITE);
+        beta  = min(prevScore + delta2, VALUE_INFINITE);
 
         // Adjust contempt based on root move's previousScore
-        int ct = base_ct + 88 * previousScore / (abs(previousScore) + 200);
+        int ct = base_ct + (base_ct ? 88 * prevScore / (abs(prevScore) + 200) : 0);
         pos->contempt = pos_stm() == WHITE ?  make_score(ct, ct / 2)
                                            : -make_score(ct, ct / 2);
       }
@@ -479,18 +481,19 @@ void thread_search(Pos *pos)
         // re-search, otherwise exit the loop.
         if (bestValue <= alpha) {
           beta = (alpha + beta) / 2;
-          alpha = max(bestValue - delta, -VALUE_INFINITE);
+          alpha = max(bestValue - delta1, -VALUE_INFINITE);
 
           if (pos->threadIdx == 0) {
             failedLow = true;
             Signals.stopOnPonderhit = 0;
           }
         } else if (bestValue >= beta) {
-          beta = min(bestValue + delta, VALUE_INFINITE);
+          beta = min(bestValue + delta2, VALUE_INFINITE);
         } else
           break;
 
-        delta += delta / 4 + 5;
+        delta1 += delta1 / 4 + 5;
+        delta2 += delta2 / 4 + 5;
 
         assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE);
       }
