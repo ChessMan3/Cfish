@@ -125,6 +125,7 @@ static Option optionsMap[] = {
   { "BestBookMove", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_best_book_move, 0, NULL },
   { "BookDepth", OPT_TYPE_SPIN, 255, 1, 255, NULL, on_book_depth, 0, NULL },
   { "LargePages", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_large_pages, 0, NULL },
+  { "Variety", OPT_TYPE_SPIN, 0, 0, 40, NULL, NULL, 0, NULL },
   { "NUMA", OPT_TYPE_STRING, 0, 0, 0, "all", on_numa, 0, NULL },
   { NULL }
 };
