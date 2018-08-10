@@ -22,13 +22,10 @@
 ### ==========================================================================
 
 ### Establish the operating system name
-KERNEL = $(shell uname -s)
-ifeq ($(KERNEL),Linux)
-	OS = $(shell uname -o)
-endif
+UNAME = $(shell uname)
 
 ### Executable name
-EXE = cfish
+EXE = Cfish
 
 ### Installation dir definitions
 PREFIX = /usr/local
@@ -69,82 +66,75 @@ OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 ### 2.1. General and architecture defaults
 debug = no
 optimize = yes
-arch = x86_64
+arch = armv8
 bits = 64
-prefetch = yes
+prefetch = no
 popcnt = yes
-sse = yes
+sse = no
 pext = no
-native = yes
-numa = yes
-lto = no
-extra = no
+native = no
+numa = no
+lto = yes
+extra = yes
 
 ### 2.2 Architecture specific
 
 ifeq ($(ARCH),general-32)
 	arch = any
-	bits = 32
-	prefetch = no
-	sse = no
-	popcnt = no
 endif
 
 ifeq ($(ARCH),x86-32-old)
 	arch = i386
-	bits = 32
-	prefetch = no
-	sse = no
-	popcnt = no
 endif
 
 ifeq ($(ARCH),x86-32)
 	arch = i386
-	bits = 32
-	popcnt = no
+	prefetch = yes
+	sse = yes
 endif
 
 ifeq ($(ARCH),general-64)
 	arch = any
-	prefetch = no
-	sse = no
-	popcnt = no
+	bits = 64
 endif
 
 ifeq ($(ARCH),x86-64)
 	arch = x86_64
+	bits = 64
+	prefetch = yes
+	sse = yes
 	popcnt = no
 endif
 
 ifeq ($(ARCH),x86-64-modern)
 	arch = x86_64
+	bits = 64
+	prefetch = yes
+	popcnt = yes
+	sse = yes
 endif
 
 ifeq ($(ARCH),x86-64-bmi2)
 	arch = x86_64
+	bits = 64
+	prefetch = yes
+	popcnt = yes
+	sse = yes
 	pext = yes
 endif
 
-ifeq ($(ARCH),armv7)
-	arch = armv7
-	bits = 32
-	sse = no
-	popcnt = no
+ifeq ($(ARCH),armv8)
+	arch = armv8
+	prefetch = yes
 endif
 
 ifeq ($(ARCH),ppc-32)
 	arch = ppc
-	bits = 32
-	prefetch = no
-	sse = no
-	popcnt = no
 endif
 
 ifeq ($(ARCH),ppc-64)
 	arch = ppc64
-	prefetch = no
-	sse = no
-	popcnt = no
+	bits = 64
 endif
 
 
@@ -165,31 +155,16 @@ endif
 ifeq ($(COMP),gcc)
 	comp=gcc
 	CC=gcc
-	CFLAGS += -pedantic -Wextra -Wshadow
-	ifeq ($(ARCH),armv7)
-		ifeq ($(OS),Android)
-			CFLAGS += -m$(bits)
-			LDFLAGS += -m$(bits)
-		endif
-	else
-		CFLAGS += -m$(bits)
-		LDFLAGS += -m$(bits)
-	endif
-
-	ifneq ($(KERNEL),Darwin)
-		LDFLAGS += -Wl,--no-as-needed
-	endif
-
-	ifneq ($(KERNEL),$(filter $(KERNEL),Linux Darwin Haiku))
-		CFLAGS += -Wno-pedantic-ms-format
+	CFLAGS += -pedantic -Wextra -Wshadow -D_POSIX_C_SOURCE=199506L
+	ifneq ($(UNAME),Darwin)
+	   LDFLAGS += #-Wl,--no-as-needed
 	endif
 endif
 
 ifeq ($(COMP),mingw)
 	comp=mingw
-	CFLAGS += -pedantic -Wextra -Wshadow -Wno-pedantic-ms-format -m$(bits)
-	LDFLAGS += -m$(bits)
-	ifeq ($(KERNEL),Linux)
+
+	ifeq ($(UNAME),Linux)
 		ifeq ($(bits),64)
 #			ifeq ($(shell which x86_64-w64-mingw32-cc-posix),)
 				CC=x86_64-w64-mingw32-gcc
@@ -206,6 +181,9 @@ ifeq ($(COMP),mingw)
 	else
 		CC=gcc
 	endif
+
+	CFLAGS += -Wextra -Wshadow
+	LDFLAGS += #-static
 endif
 
 ifeq ($(COMP),icc)
@@ -217,27 +195,12 @@ endif
 ifeq ($(COMP),clang)
 	comp=clang
 	CC=clang
-	CFLAGS += -pedantic -Wextra -Wshadow -Wno-missing-braces -Wno-missing-field-initializers -Wno-unknown-attributes
-	ifeq ($(ARCH),armv7)
-		ifeq ($(OS),Android)
-			CFLAGS += -m$(bits)
-			LDFLAGS += -m$(bits)
-		endif
-	else
-		CFLAGS += -m$(bits)
-		LDFLAGS += -m$(bits)
-	endif
-
-	ifeq ($(KERNEL),Darwin)
+	CFLAGS += -pedantic -Wextra -Wshadow -Wno-missing-braces -Wno-missing-field-initializers -Wno-unknown-attributes -m$(bits)
+	LDFLAGS += -m$(bits)
+	ifeq ($(UNAME),Darwin)
 		CFLAGS += 
 		DEPENDFLAGS += 
 	endif
-endif
-
-ifneq ($(COMP),mingw)
-ifeq ($(KERNEL),$(filter $(KERNEL),Linux Darwin Haiku))
-	CFLAGS += -D_POSIX_C_SOURCE=199506L
-endif
 endif
 
 ifeq ($(comp),icc)
@@ -253,7 +216,7 @@ else
 endif
 endif
 
-ifeq ($(KERNEL),Darwin)
+ifeq ($(UNAME),Darwin)
 	CFLAGS += -arch $(arch) -mmacosx-version-min=10.9
 	LDFLAGS += -arch $(arch) -mmacosx-version-min=10.9
 endif
@@ -271,10 +234,10 @@ endif
 ### On mingw use Windows threads, otherwise POSIX
 ifneq ($(comp),mingw)
 	# On Android Bionic's C library comes with its own pthread implementation bundled in
-	ifneq ($(arch),armv7)
+	ifneq ($(arch),armv8)
 		# Haiku has pthreads in its libroot, so only link it in on other platforms
-		ifneq ($(KERNEL),Haiku)
-			LDFLAGS += -lpthread
+		ifneq ($(UNAME),Haiku)
+			LDFLAGS += #-lpthread
 		endif
 	endif
 endif
@@ -291,19 +254,42 @@ ifeq ($(optimize),yes)
 
 	CFLAGS += -O3
 
-	ifeq ($(comp),$(filter $(comp),gcc mingw))
-		ifeq ($(extra),yes)
-			CFLAGS += -fira-loop-pressure -fconserve-stack -fmodulo-sched -fmodulo-sched-allow-regmoves -fsched-pressure -flimit-function-alignment
+	ifeq ($(extra),yes)
+		CFLAGS += -fira-loop-pressure -fconserve-stack -fmodulo-sched -fmodulo-sched-allow-regmoves -fsched-pressure -flimit-function-alignment
+	endif
+
+	ifeq ($(comp),gcc)
+
+		ifeq ($(UNAME),Darwin)
+			ifeq ($(arch),i386)
+				CFLAGS += -mdynamic-no-pic
+			endif
+			ifeq ($(arch),x86_64)
+				CFLAGS += -mdynamic-no-pic
+			endif
 		endif
 
-		ifeq ($(OS),Android)
-			CFLAGS += -fno-gcse -mthumb -march=armv7-a -mfloat-abi=softfp
+		ifeq ($(arch),armv8)
+			CFLAGS += -march=armv8-a
 		endif
 	endif
 
-	ifeq ($(comp),$(filter $(comp),gcc clang icc))
-		ifeq ($(KERNEL),Darwin)
+	ifeq ($(comp),icc)
+		ifeq ($(UNAME),Darwin)
 			CFLAGS += -mdynamic-no-pic
+		endif
+	endif
+
+	ifeq ($(comp),clang)
+		ifeq ($(UNAME),Darwin)
+			CFLAGS += -flto
+			LDFLAGS += $(CFLAGS)
+			ifeq ($(arch),i386)
+				CFLAGS += -mdynamic-no-pic
+			endif
+			ifeq ($(arch),x86_64)
+				CFLAGS += -mdynamic-no-pic
+			endif
 		endif
 	endif
 endif
@@ -320,15 +306,15 @@ ifeq ($(prefetch),yes)
 		DEPENDFLAGS += -msse
 	endif
 else
-	CFLAGS += -DNO_PREFETCH
+	CFLAGS += #-DNO_PREFETCH
 endif
 
 ### 3.6 popcnt
 ifeq ($(popcnt),yes)
 	ifeq ($(comp),icc)
-		CFLAGS += -msse3 -DUSE_POPCNT
+		CFLAGS += -DUSE_POPCNT
 	else
-		CFLAGS += -msse3 -mpopcnt -DUSE_POPCNT
+		CFLAGS += -DUSE_POPCNT
 	endif
 endif
 
@@ -348,7 +334,7 @@ endif
 ### numa
 ifeq ($(numa),yes)
 	CFLAGS += -DNUMA
-        ifeq ($(KERNEL),Linux)
+        ifeq ($(UNAME),Linux)
         ifneq ($(comp),mingw)
 		LDFLAGS += -lnuma
         endif
@@ -358,22 +344,46 @@ endif
 ### 3.8 Link Time Optimization, it works since gcc 4.5 but not on mingw under Windows.
 ### This is a mix of compile and link time options because the lto link phase
 ### needs access to the optimization flags.
-ifeq ($(lto),yes)
-ifeq ($(optimize),yes)
-ifeq ($(debug),no)
-	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
+ifeq ($(comp),gcc)
+	ifeq ($(optimize),yes)
+	ifeq ($(lto),yes)
+	ifeq ($(debug),no)
 		CFLAGS += -flto
-		LDFLAGS += $(CFLAGS)
+		LDFLAGS += #$(CFLAGS)
+	endif
+	endif
 	endif
 endif
+
+ifeq ($(comp),clang)
+	ifeq ($(optimize),yes)
+	ifeq ($(lto),yes)
+	ifeq ($(debug),no)
+		CFLAGS += -flto
+		LDFLAGS += #$(CFLAGS)
+	endif
+	endif
+	endif
 endif
+
+ifeq ($(comp),mingw)
+	ifeq ($(UNAME),Linux)
+	ifeq ($(optimize),yes)
+	ifeq ($(lto),yes)
+	ifeq ($(debug),no)
+		CFLAGS += -flto
+		LDFLAGS += #$(CFLAGS)
+	endif
+	endif
+	endif
+	endif
 endif
 
 ### 3.9 Android 5 can only run position independent executables. Note that this
 ### breaks Android 4.0 and earlier.
-ifeq ($(arch),armv7)
-	CFLAGS += -fPIE
-	LDFLAGS += -fPIE -pie
+ifeq ($(arch),armv8)
+	CFLAGS +=
+	LDFLAGS += -static -lpthread -march=armv8-a
 endif
 
 
@@ -404,7 +414,7 @@ help:
 	@echo "x86-32-old              > x86 32-bit fall back for old hardware"
 	@echo "ppc-64                  > PPC 64-bit"
 	@echo "ppc-32                  > PPC 32-bit"
-	@echo "armv7                   > ARMv7 32-bit"
+	@echo "armv8                   > ARMv8 64-bit"
 	@echo "general-64              > unspecified 64-bit"
 	@echo "general-32              > unspecified 32-bit"
 	@echo ""
@@ -445,8 +455,9 @@ profile-build: config-sanity objclean profileclean
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) objclean
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) $(profile_use)
 	@echo ""
-	@echo "Step 4/4. NOT deleting profile data ..."
-#	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) profileclean
+	@echo "Step 4/4. deleting profile data ..."
+	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) profileclean
+	strip $(EXE)
 
 strip:
 	strip $(EXE)
@@ -465,7 +476,7 @@ objclean:
 profileclean:
 	@rm -rf profdir
 	@rm -f bench.txt *.gcda *.gcno
-	@rm -f cfish.profdata *.profraw
+	@rm -f Cfish.profdata *.profraw
 
 default:
 	help
@@ -498,7 +509,7 @@ config-sanity:
 	@test "$(debug)" = "yes" || test "$(debug)" = "no"
 	@test "$(optimize)" = "yes" || test "$(optimize)" = "no"
 	@test "$(arch)" = "any" || test "$(arch)" = "x86_64" || test "$(arch)" = "i386" || \
-	 test "$(arch)" = "ppc64" || test "$(arch)" = "ppc" || test "$(arch)" = "armv7"
+	 test "$(arch)" = "ppc64" || test "$(arch)" = "ppc" || test "$(arch)" = "armv8"
 	@test "$(bits)" = "32" || test "$(bits)" = "64"
 	@test "$(prefetch)" = "yes" || test "$(prefetch)" = "no"
 	@test "$(popcnt)" = "yes" || test "$(popcnt)" = "no"
@@ -517,9 +528,9 @@ clang-profile-make:
 	all
 
 clang-profile-use:
-	llvm-profdata merge -output=cfish.profdata *.profraw
+	llvm-profdata merge -output=Cfish.profdata *.profraw
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) \
-	EXTRACFLAGS='-fprofile-instr-use=cfish.profdata' \
+	EXTRACFLAGS='-fprofile-instr-use=Cfish.profdata' \
 	EXTRALDFLAGS='-fprofile-use ' \
 	all
 
