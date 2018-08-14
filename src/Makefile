@@ -61,6 +61,7 @@ OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 # native = yes/no     --- -march=native    --- Optimize for local CPU
 # numa = yes/no       --- -DNUMA           --- Enable NUMA support
 # lto = yes/no        --- -flto            --- Enable link-time optimization
+# avx2 = yes/no       --- -DUSE_AVX2       --- Use AVX2 asm-instruction
 #
 # Note that Makefile is space sensitive, so when adding new architectures
 # or modifying existing flags, you have to make sure there are no extra spaces
@@ -79,6 +80,8 @@ native = yes
 numa = yes
 lto = no
 extra = no
+avx2 = no
+bmi1 = no
 
 ### 2.2 Architecture specific
 
@@ -123,6 +126,16 @@ endif
 ifeq ($(ARCH),x86-64-bmi2)
 	arch = x86_64
 	pext = yes
+endif
+
+ifeq ($(ARCH),x86-64-bmi1)
+	arch = x86_64
+	bmi1 = yes
+endif
+
+ifeq ($(ARCH),x86-64-avx2)
+	arch = x86_64
+	avx2 = yes
 endif
 
 ifeq ($(ARCH),armv7)
@@ -338,6 +351,16 @@ ifeq ($(pext),yes)
 	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
 		CFLAGS += -mbmi2
 	endif
+endif
+
+### 3.7a AVX2
+ifeq ($(avx2),yes)
+	CFLAGS += -mavx2 -DUSE_AVX2
+endif
+
+### 3.7b BMI1
+ifeq ($(bmi1),yes)
+	CFLAGS += -mbmi -DUSE_BMI1
 endif
 
 ### native
