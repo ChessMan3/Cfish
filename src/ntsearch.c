@@ -483,7 +483,7 @@ moves_loop: // When in check search starts from here.
         int lmrDepth = max(newDepth - reduction(improving, depth, moveCount, NT), DEPTH_ZERO) / ONE_PLY;
 
         // Countermoves based pruning
-        if (   lmrDepth < 3
+        if (   lmrDepth < 3 + ((ss-1)->statScore > 0)
             && (*cmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold
             && (*fmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold)
           continue;
@@ -538,11 +538,9 @@ moves_loop: // When in check search starts from here.
       Depth r = reduction(improving, depth, moveCount, NT);
 
       if (captureOrPromotion) {
-        // Increase reduction depending on opponent's stat score
-        if ((ss-1)->statScore >= 0)
-          r += ONE_PLY;
-
-        r -= r ? ONE_PLY : DEPTH_ZERO;
+        // Decrease reduction depending on opponent's stat score
+        if ((ss-1)->statScore < 0)
+          r -= ONE_PLY;
       } else {
         // Decrease reduction if opponent's move count is high
         if ((ss-1)->moveCount > 15)
@@ -582,10 +580,10 @@ moves_loop: // When in check search starts from here.
           r += ONE_PLY;
 
         // Decrease/increase reduction for moves with a good/bad history.
-        r = max(DEPTH_ZERO, (r / ONE_PLY - ss->statScore / 20000) * ONE_PLY);
+        r -= ss->statScore / 20000 * ONE_PLY;
       }
 
-      Depth d = max(newDepth - r, ONE_PLY);
+      Depth d = max(newDepth - max(r, DEPTH_ZERO), ONE_PLY);
 
       value = -search_NonPV(pos, ss+1, -(alpha+1), d, 1);
 
@@ -700,9 +698,9 @@ moves_loop: // When in check search starts from here.
     if (!is_capture_or_promotion(pos, bestMove))
       update_stats(pos, ss, bestMove, quietsSearched, quietCount,
           stat_bonus(depth + (bestValue > beta + PawnValueMg) * ONE_PLY));
-    else
-      update_capture_stats(pos, bestMove, capturesSearched, captureCount,
-          stat_bonus(depth + ONE_PLY));
+
+    update_capture_stats(pos, bestMove, capturesSearched, captureCount,
+        stat_bonus(depth + ONE_PLY));
 
     // Extra penalty for a quiet TT move in previous ply when it gets refuted.
     if ((ss-1)->moveCount == 1 && !captured_piece())
