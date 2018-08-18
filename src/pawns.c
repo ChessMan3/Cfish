@@ -29,9 +29,9 @@
 #define S(mg, eg) make_score(mg, eg)
 
 // Pawn penalties
-static const Score Isolated = S( 6, 16);
-static const Score Backward = S(15, 21);
-static const Score Doubled  = S( 8, 44);
+static const Score Isolated = S( 5, 15);
+static const Score Backward = S( 9, 24);
+static const Score Doubled  = S(11, 56);
 
 // Connected pawn bonus by opposed, phalanx, #support and rank
 static Score Connected[2][2][3][8];
@@ -40,25 +40,25 @@ static Score Connected[2][2][3][8];
 // RANK_1 = 0 is used for files where we have no pawn, or pawn is behind
 // our king.
 static const Value ShelterStrength[4][8] = {
-  { V( 28), V(79), V( 75), V( 46), V( 14), V( 31), V(-14) },
-  { V(-48), V(50), V( 29), V(-21), V(-41), V(-23), V(-45) },
-  { V(-25), V(50), V( 17), V(-33), V( -5), V(  9), V(-35) },
-  { V(-29), V(57), V(-25), V(-48), V( -4), V(-46), V(-64) }
+  { V( -3), V( 81), V( 93), V( 58), V( 39), V( 18), V(  25) },
+  { V(-40), V( 61), V( 35), V(-49), V(-29), V(-11), V( -63) },
+  { V( -7), V( 75), V( 23), V( -2), V( 32), V(  3), V( -45) },
+  { V(-36), V(-13), V(-29), V(-52), V(-48), V(-67), V(-166) }
 };
 
 // Danger of enemry pawns moving toward our king by [distance from edge][rank].
 // RANK_1 = 0 is used for files where the enemy has no pawn or where their
 // pawn is behind our king
 static const Value UnblockedStorm[4][8] = {
-  { V( 34), V( 58), V(113), V( 61), V( 37), V( 24), V( 21) },
-  { V( 23), V( 46), V( 93), V( 10), V(  2), V(-20), V(  6) },
-  { V( -6), V( 22), V(106), V( 28), V(  6), V(-33), V( -1) },
-  { V(-17), V( 33), V( 71), V( 14), V( -9), V(-21), V(-16) }
+  { V( 89), V(107), V(123), V(93), V(57), V( 45), V( 51) },
+  { V( 44), V(-18), V(123), V(46), V(39), V( -7), V( 23) },
+  { V(  4), V( 52), V(162), V(37), V( 7), V(-14), V( -2) },
+  { V(-10), V(-14), V( 90), V(15), V( 2), V( -7), V(-16) }
 };
 
 // Danger of blocked enemy pawns storming our king, by rank
 static const Value BlockedStorm[8] =
-  { V(0), V(0), V( 58), V(-13), V(-22), V(-3), V(-5) };
+  { V(0), V(0), V(66), V(6), V(5), V(1), V(15) };
 
 #undef S
 #undef V
@@ -115,7 +115,6 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     // which could become passed after one or two pawn pushes when they
     // are not attacked more times than defended.
     if (   !(stoppers ^ lever ^ leverPush)
-        && !(ourPawns & forward_file_bb(Us, s))
         && popcount(supported) >= popcount(lever) - 1
         && popcount(phalanx)   >= popcount(leverPush))
       e->passedPawns[Us] |= sq_bb(s);
@@ -191,8 +190,7 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
   const Bitboard BlockRanks =
                    (Us == WHITE ? Rank1BB | Rank2BB : Rank8BB | Rank7BB);
   
-  Bitboard b =  pieces_p(PAWN)
-              & (forward_ranks_bb(Us, rank_of(ksq)) | rank_bb_s(ksq));
+  Bitboard b =  pieces_p(PAWN) & ~forward_ranks_bb(Them, rank_of(ksq));
   Bitboard ourPawns = b & pieces_c(Us);
   Bitboard theirPawns = b & pieces_c(Them);
   Value safety = (ourPawns & file_bb_s(ksq)) ? 5 : -5;
