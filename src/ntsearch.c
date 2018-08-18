@@ -483,7 +483,7 @@ moves_loop: // When in check search starts from here.
         int lmrDepth = max(newDepth - reduction(improving, depth, moveCount, NT), DEPTH_ZERO) / ONE_PLY;
 
         // Countermoves based pruning
-        if (   lmrDepth <= ((ss-1)->statScore > 0 ? 3 : 2)
+        if (   lmrDepth < 3 + ((ss-1)->statScore > 0)
             && (*cmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold
             && (*fmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold)
           continue;
@@ -537,15 +537,12 @@ moves_loop: // When in check search starts from here.
     {
       Depth r = reduction(improving, depth, moveCount, NT);
 
-      if (captureOrPromotion) {
-        // Decrease reduction depending on opponent's stat score
-        if ((ss-1)->statScore < 0)
-          r -= ONE_PLY;
-      } else {
-        // Decrease reduction if opponent's move count is high
-        if ((ss-1)->moveCount > 15)
-          r -= ONE_PLY;
+      // Decrease reduction if opponent's move count is high (~10 Elo)
+      if ((ss-1)->moveCount > 15)
+        r -= ONE_PLY;
 
+      if (!captureOrPromotion)
+      {
         // Decrease reduction for exact PV nodes
         if (pvExact)
           r -= ONE_PLY;
