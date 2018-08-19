@@ -110,8 +110,6 @@ void position(Pos *pos, char *str)
         break;
     if (l <= pos->st->pliesFromNull)
       pos->hasRepeated = 1;
-    else
-      (pos->st - k)->key = 0;
   }
   pos->rootKeyFlip ^= pos->st->key;
   pos->st->key ^= pos->rootKeyFlip;
