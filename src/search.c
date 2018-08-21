@@ -59,8 +59,7 @@ static Score base_ct;
 static const int skipSize[20] = {1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
 static const int skipPhase[20] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
 
-static const int RazorMargin1 = 590;
-static const int RazorMargin2 = 604;
+static const int RazorMargin = 600;
 
 INLINE int futility_margin(Depth d, int improving) {
   return (175 - 50 * improving) * d / ONE_PLY;
@@ -79,7 +78,7 @@ INLINE Depth reduction(int i, Depth d, int mn, const int NT)
 static Value stat_bonus(Depth depth)
 {
   int d = depth / ONE_PLY;
-  return d > 17 ? 0 : 33 * d * d + 66 * d - 66;
+  return d > 17 ? 0 : 29 * d * d + 138 * d - 134;
 }
 
 // Skill structure is used to implement strength limit
@@ -306,14 +305,32 @@ void mainthread_search(void)
 //      && !Skill(option_value(OPT_SKILL_LEVEL)).enabled()
       &&  pos->rootMoves->move[0].pv[0] != 0)
   {
+    int i, num = 0, maxNum = min(pos->rootMoves->size, Threads.numThreads);
+    Move mvs[maxNum];
+    int votes[maxNum];
+    Value minScore = pos->rootMoves->move[0].score;
+    for (int idx = 1; idx < Threads.numThreads; idx++)
+      minScore = min(minScore, Threads.pos[idx]->rootMoves->move[0].score);
+    for (int idx = 0; idx < Threads.numThreads; idx++) {
+      Pos *p = Threads.pos[idx];
+      Move m = p->rootMoves->move[0].pv[0];
+      for (i = 0; i < num; i++)
+        if (mvs[i] == m) break;
+      if (i == num) {
+        num++;
+        mvs[i] = m;
+        votes[i] = 0;
+      }
+      votes[i] += p->rootMoves->move[0].score - minScore + p->completedDepth;
+    }
+    int bestVote = votes[0];
     for (int idx = 1; idx < Threads.numThreads; idx++) {
       Pos *p = Threads.pos[idx];
-      Depth depthDiff = p->completedDepth - bestThread->completedDepth;
-      Value scoreDiff = p->rootMoves->move[0].score - bestThread->rootMoves->move[0].score;
-      // Select the thread with the best score, always if it is a mate
-      if (    scoreDiff > 0
-          && (depthDiff >= 0 || p->rootMoves->move[0].score >= VALUE_MATE_IN_MAX_PLY))
+      for (i = 0; mvs[i] != p->rootMoves->move[0].pv[0]; i++);
+      if (votes[i] > bestVote) {
+        bestVote = votes[i];
         bestThread = p;
+      }
     }
   }
 
