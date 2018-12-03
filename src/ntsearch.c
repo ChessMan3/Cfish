@@ -24,11 +24,15 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && has_game_cycle(pos))
   {
 #if PvNode
-      alpha = VALUE_DRAW;
+      alpha = value_draw(depth, pos);
       if (alpha >= beta)
         return alpha;
 #else
-      return VALUE_DRAW;
+      // Yucky randomisation made this necessary
+      Value tmp_alpha = value_draw(depth, pos);
+      if (tmp_alpha >= beta)
+        return tmp_alpha;
+      alpha = tmp_alpha;
 #endif
   }
 
@@ -52,10 +56,10 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Key posKey;
   Move ttMove, move, excludedMove, bestMove;
   Depth extension, newDepth;
-  Value bestValue, value, ttValue, eval, maxValue;
+  Value bestValue, value, ttValue, eval, maxValue, pureStaticEval;
   int ttHit, inCheck, givesCheck, improving;
   int captureOrPromotion, doFullDepthSearch, moveCountPruning, skipQuiets;
-  int ttCapture, pvExact;
+  bool ttCapture, pvExact;
   Piece movedPiece;
   int moveCount, captureCount, quietCount;
 
@@ -84,9 +88,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   if (!rootNode) {
     // Step 2. Check for aborted search and immediate draw
     if (load_rlx(Signals.stop) || is_draw(pos) || ss->ply >= MAX_PLY)
-      return  ss->ply >= MAX_PLY && !inCheck
-            ? evaluate(pos) - 10 * ((ss-1)->statScore > 0)
-            : VALUE_DRAW;
+      return  ss->ply >= MAX_PLY && !inCheck ? evaluate(pos)
+                                             : value_draw(depth, pos);
 
     // Step 3. Mate distance pruning. Even if we mate at the next move our
     // score would be at best mate_in(ss->ply+1), but if alpha is already
@@ -217,29 +220,31 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
   // Step 6. Static evaluation of the position
   if (inCheck) {
-    ss->staticEval = VALUE_NONE;
+    ss->staticEval = pureStaticEval = VALUE_NONE;
     improving = 0;
     goto moves_loop; // Skip early pruning when in check
   } else if (ttHit) {
     // Never assume anything on values stored in TT
-    if ((ss->staticEval = eval = tte_eval(tte)) == VALUE_NONE)
-      eval = ss->staticEval = evaluate(pos) - 10 * ((ss-1)->statScore > 0);
+    if ((eval = tte_eval(tte)) == VALUE_NONE)
+      eval = evaluate(pos);
+    ss->staticEval = pureStaticEval = eval;
 
     // Can ttValue be used as a better position evaluation?
     if (ttValue != VALUE_NONE)
       if (tte_bound(tte) & (ttValue > eval ? BOUND_LOWER : BOUND_UPPER))
         eval = ttValue;
   } else {
-    int p = (ss-1)->statScore;
-    int malus = p > 0 ? (p + 5000) / 1024 :
-                p < 0 ? (p - 5000) / 1024 : 0;
-
-    ss->staticEval = eval =
-    (ss-1)->currentMove != MOVE_NULL ? evaluate(pos) - malus
-                                     : -(ss-1)->staticEval + 2 * Tempo;
+    if ((ss-1)->currentMove != MOVE_NULL) {
+      int p = (ss-1)->statScore;
+      int bonus = p > 0 ? (-p - 2500) / 512 :
+                  p < 0 ? (-p + 2500) / 512 : 0;
+      pureStaticEval = evaluate(pos);
+      ss->staticEval = eval = pureStaticEval + bonus;
+    } else
+      ss->staticEval = eval = pureStaticEval = -(ss-1)->staticEval + 2 * Tempo;
 
     tte_save(tte, posKey, VALUE_NONE, BOUND_NONE, DEPTH_NONE, 0,
-             ss->staticEval, tt_generation());
+             pureStaticEval, tt_generation());
   }
 
   // Step 7. Razoring
@@ -263,7 +268,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && (ss-1)->currentMove != MOVE_NULL
       && (ss-1)->statScore < 23200
       && eval >= beta
-      && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
+      && pureStaticEval >= beta - 36 * depth / ONE_PLY + 225
       && !excludedMove
       && pos_non_pawn_material(pos_stm())
       && (ss->ply >= pos->nmpPly || ss->ply % 2 != pos->nmpOdd))
@@ -271,7 +276,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     assert(eval - beta >= 0);
 
     // Null move dynamic reduction based on depth and value
-    Depth R = ((823 + 67 * depth / ONE_PLY) / 256 + min((eval - beta) / PawnValueMg, 3)) * ONE_PLY;
+    Depth R = ((823 + 67 * depth / ONE_PLY) / 256 + min((eval - beta) / 200, 3)) * ONE_PLY;
 
     ss->currentMove = MOVE_NULL;
     ss->history = &(*pos->counterMoveHistory)[0][0];
@@ -321,7 +326,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
     int probCutCount = 3;
     while ((move = next_move(pos, 0)) && probCutCount)
-      if (is_legal(pos, move)) {
+      if (move != excludedMove && is_legal(pos, move)) {
         probCutCount--;
         ss->currentMove = move;
         ss->history = &(*pos->counterMoveHistory)[moved_piece(move)][to_sq(move)];
@@ -367,7 +372,7 @@ moves_loop: // When in check search starts from here.
   value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
 
   skipQuiets = 0;
-  ttCapture = 0;
+  ttCapture = ttMove && is_capture_or_promotion(pos, ttMove);
   pvExact = PvNode && ttHit && tte_bound(tte) == BOUND_EXACT;
 
   // Step 12. Loop through moves
@@ -451,8 +456,13 @@ moves_loop: // When in check search starts from here.
       ss->mpKillers[0] = k1; ss->mpKillers[1] = k2;
     }
     else if (    givesCheck
-             && !moveCountPruning
              &&  see_test(pos, move, 0))
+      extension = ONE_PLY;
+
+    // Extension for king moves that change castling rights
+    if (   type_of_p(movedPiece) == KING
+        && can_castle_c(pos_stm())
+        && depth < 12 * ONE_PLY)
       extension = ONE_PLY;
 
     // Calculate new depth for this move
@@ -510,9 +520,6 @@ moves_loop: // When in check search starts from here.
       ss->moveCount = --moveCount;
       continue;
     }
-
-    if (move == ttMove && captureOrPromotion)
-      ttCapture = 1;
 
     // Update the current move (this must be done after singular extension
     // search)
@@ -711,7 +718,7 @@ moves_loop: // When in check search starts from here.
     tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
         bestValue >= beta ? BOUND_LOWER :
         PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
-        depth, bestMove, ss->staticEval, tt_generation());
+        depth, bestMove, pureStaticEval, tt_generation());
 
   assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 
