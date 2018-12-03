@@ -531,10 +531,9 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
       score += ThreatByKing;
 
     // Bonus for overload (non-pawn enemies attacked and defended exactly once)
-    b = ~ei->attackedBy[Them][0] 
-	   | (nonPawnEnemies & ~ei->attackedBy2[Us]);
-    
-	score += Hanging * popcount(weak & (b));
+    b =  ~ei->attackedBy[Them][0]
+           | (nonPawnEnemies & ei->attackedBy2[Us]);
+        score += Hanging * popcount(weak & (b));
   }
 
   // Bonus for restricting their piece moves
