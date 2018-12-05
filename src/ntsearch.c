@@ -459,8 +459,8 @@ moves_loop: // When in check search starts from here.
              &&  see_test(pos, move, 0))
       extension = ONE_PLY;
 
-    // Extension for king moves that change castling rights
-    else if (   type_of_p(movedPiece) == KING
+    // Extension if castling
+    else if (   type_of_m(move) == CASTLING
         && can_castle_c(pos_stm()))
       extension = ONE_PLY;
 
@@ -703,6 +703,13 @@ moves_loop: // When in check search starts from here.
     if ((ss-1)->moveCount == 1 && !captured_piece())
       update_cm_stats(ss-1, piece_on(prevSq), prevSq,
           -stat_bonus(depth + ONE_PLY));
+		  
+	// Extra penalty for killer move in previous ply when it gets refuted
+	else if (  (ss-1)->killers[0]
+	        && (ss-1)->currentMove == (ss-1)->killers[0]
+			&& !captured_piece())
+      update_cm_stats(ss-1, piece_on(prevSq), prevSq,
+		  -stat_bonus(depth));			
   }
   // Bonus for prior countermove that caused the fail low.
   else if (   (depth >= 3 * ONE_PLY || PvNode)
