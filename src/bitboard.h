@@ -145,6 +145,13 @@ INLINE Bitboard shift_bb(int Direction, Bitboard b)
         : 0;
 }
 
+// double_pawn_attacks_bb() returns the pawn attacks for the given color
+// from the squares in the given bitboard.
+
+INLINE Bitboard double_pawn_attacks_bb(Color C, Bitboard b) {
+  return C == WHITE ? shift_bb(NORTH_WEST, b) & shift_bb(NORTH_EAST, b)
+                    : shift_bb(SOUTH_WEST, b) & shift_bb(SOUTH_EAST, b);
+}
 
 // adjacent_files_bb() returns a bitboard representing all the squares
 // on the adjacent files of the given one.

@@ -171,7 +171,6 @@ static const Score KingProtector      = S(  6,  7);
 static const Score KnightOnQueen      = S( 20, 12);
 static const Score LongDiagonalBishop = S( 44,  0);
 static const Score MinorBehindPawn    = S( 16,  0);
-static const Score Overload           = S( 12,  6);
 static const Score PawnlessFlank      = S( 18, 94);
 static const Score RestrictedPiece    = S(  7,  6);
 static const Score RookOnPawn         = S( 10, 28);
@@ -261,7 +260,7 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
     ei->attackedBy[Us][0] |= b;
     ei->attackedBy[Us][Pt] |= b;
 
-    if (b & ei->kingRing[Them]) {
+    if (b & ei->kingRing[Them] & ~double_pawn_attacks_bb(Them, pieces_cp(Them, PAWN))) {
       ei->kingAttackersCount[Us]++;
       ei->kingAttackersWeight[Us] += KingAttackWeights[Pt];
       ei->kingAttacksCount[Us] += popcount(b & ei->attackedBy[Them][KING]);
@@ -532,10 +531,9 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
       score += ThreatByKing;
 
     // Bonus for overload (non-pawn enemies attacked and defended exactly once)
-    b = weak & nonPawnEnemies & ei->attackedBy[Them][0];
-    score += Overload * popcount(b);
-
-    score += Hanging * popcount(weak & ~ei->attackedBy[Them][0]);
+    b =  ~ei->attackedBy[Them][0]
+           | (nonPawnEnemies & ei->attackedBy2[Us]);
+        score += Hanging * popcount(weak & b);
   }
 
   // Bonus for restricting their piece moves
