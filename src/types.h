@@ -293,12 +293,6 @@ extern uint32_t NonPawnPieceValue[16];
 #define make_castling(from,to) ((Move)((to) | ((from)<<6) | (CASTLING<<14)))
 #define move_is_ok(m) (from_sq(m) != to_sq(m))
 
-INLINE int opposite_colors(Square s1, Square s2)
-{
-  int s = s1 ^ s2;
-  return ((s >> 3) ^ s) & 1;
-}
-
 typedef struct Pos Pos;
 typedef struct LimitsType LimitsType;
 typedef struct RootMove RootMove;

@@ -697,18 +697,12 @@ moves_loop: // When in check search starts from here.
 
     update_capture_stats(pos, bestMove, capturesSearched, captureCount,
         stat_bonus(depth + ONE_PLY));
-
-    // Extra penalty for a quiet TT move in previous ply when it gets refuted.
-    if ((ss-1)->moveCount == 1 && !captured_piece())
-      update_cm_stats(ss-1, piece_on(prevSq), prevSq,
-          -stat_bonus(depth + ONE_PLY));
 		  
-	// Extra penalty for killer move in previous ply when it gets refuted
-	else if (  (ss-1)->killers[0]
-	        && (ss-1)->currentMove == (ss-1)->killers[0]
-			&& !captured_piece())
-      update_cm_stats(ss-1, piece_on(prevSq), prevSq,
-		  -stat_bonus(depth));			
+		  // Extra penalty for a quiet TT or main killer move in previous ply when it gets refuted
+		if (   (ss-1)->moveCount == 1
+		    || ((ss-1)->currentMove == (ss-1)->killers[0] && (ss-1)->killers[0]))
+		    if (!captured_piece())
+                update_cm_stats(ss-1, piece_on(prevSq), prevSq, -stat_bonus(depth + ONE_PLY));
   }
   // Bonus for prior countermove that caused the fail low.
   else if (   (depth >= 3 * ONE_PLY || PvNode)
