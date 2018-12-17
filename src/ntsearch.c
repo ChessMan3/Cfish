@@ -486,7 +486,7 @@ moves_loop: // When in check search starts from here.
         int lmrDepth = max(newDepth - reduction(improving, depth, moveCount, NT), DEPTH_ZERO) / ONE_PLY;
 
         // Countermoves based pruning
-        if (   lmrDepth < 3 + ((ss-1)->statScore > 0)
+        if (   lmrDepth < 3 + ((ss-1)->statScore > 0 || (ss-1)->moveCount == 1)
             && (*cmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold
             && (*fmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold)
           continue;
